@@ -63,18 +63,3 @@ def add_ground(data: AddGroundSchema, current_user: dict = Depends(get_current_u
     return vendor_service.add_ground(data.model_dump(), current_user)
 
 
-@router.get("/")
-def get_all():
-    return vendor_service.get_all()
-
-@router.get("/{vendor_id}")
-def get_by_id(vendor_id: str):
-    return vendor_service.get_by_id(vendor_id)
-
-@router.put("/{vendor_id}")
-def update(vendor_id: str, data: dict):
-    return vendor_service.update(vendor_id, data)
-
-@router.delete("/{vendor_id}", status_code=204)
-def delete(vendor_id: str):
-    return vendor_service.delete(vendor_id)
