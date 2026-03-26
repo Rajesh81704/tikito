@@ -23,7 +23,8 @@ class AddTurfSchema(BaseModel):
     no_of_grounds: int | None = None
     turf_facilities: str | None = None
     turf_rules: str | None = None
-    turf_images: list[str] | None = None
+    turf_images: str | None = None
+    is_active: bool | None = None
 
 class EditTurfSchema(BaseModel):
     turf_name: str | None = None
@@ -32,6 +33,7 @@ class EditTurfSchema(BaseModel):
     no_of_grounds: int | None = None
     turf_facilities: str | None = None
     turf_rules: str | None = None
+
 
 class DayOfWeek(str, Enum):
     SUNDAY = "SUNDAY"
@@ -61,6 +63,7 @@ class EditGroundSchema(BaseModel):
     ground_loc: str | None = None
     ground_type: str | None = None
     slots: list[SlotSchema] | None = None
+    ground_images: str | None = None
 
 class TurfResponseSchema(BaseModel):
     turf_field_id: UUID
