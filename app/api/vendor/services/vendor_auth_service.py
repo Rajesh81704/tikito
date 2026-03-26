@@ -4,13 +4,16 @@ from app.core.connectdb import get_connection
 def signup(data: dict) -> dict:
     conn = get_connection()
     try:
-
-        check_availability=conn.execute(
-            text("SELECT vendor_phone_no, vendor_email_id from vendors where "),
+        check_availability = conn.execute(
+            text("SELECT vendor_id FROM vendors WHERE vendor_phone_no = :vendor_phone_no"),
+            {"vendor_phone_no": data.get("vendor_phone_no")}
         )
+        if check_availability.fetchone():
+            return {"error": "Phone number already registered"}
+
         result = conn.execute(
             text("""
-                INSERT INTO vendors (vendor_full_name, vendor_phone_no, vendor_email_id, vendor_address)
+                INSERT INTO vendors (vendor_full_name, vendor_phone_no, vendor_email_id, vendor_address, password)
                 VALUES (:vendor_full_name, :vendor_phone_no, :vendor_email_id, :vendor_address, :password)
                 RETURNING vendor_id
             """),
