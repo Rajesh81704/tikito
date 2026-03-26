@@ -1,22 +1,25 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from pydantic import BaseModel
 from app.api.user.services import user_service
+from app.api.core.dependencies import get_current_user
 
 router = APIRouter(prefix="/users", tags=["users"])
 
+class CreateUser(BaseModel):
+    full_name: str
+    phone_no: str
+    email: str | None = None
+    password: str
 
+@router.post("/sign-up", status_code=201)
+def sign_up(data: CreateUser):
+    return user_service.create(data.model_dump())
 
-# @router.get("/{user_id}")
-# def get_by_id(user_id: int):
-#     return user_service.get_by_id(user_id)
+@router.get("/nearby-turfs")
+def get_nearby_turfs(lat: float, lng: float, radius_km: float = 10, current_user: dict = Depends(get_current_user)):
+    return user_service.get_nearby_turfs(lat, lng, radius_km)
 
-# @router.post("/", status_code=201)
-# def create(data: dict):
-#     return user_service.create(data)
+@router.get("/turfs")
+def get_turfs_by_city(city: str, current_user: dict = Depends(get_current_user)):
+    return user_service.get_turfs_by_city(city)
 
-# @router.put("/{user_id}")
-# def update(user_id: int, data: dict):
-#     return user_service.update(user_id, data)
-
-# @router.delete("/{user_id}", status_code=204)
-# def delete(user_id: int):
-#     return user_service.delete(user_id)

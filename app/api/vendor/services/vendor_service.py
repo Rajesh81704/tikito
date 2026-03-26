@@ -215,3 +215,33 @@ def get_grounds_by_turf(turf_field_id: str) -> list:
         return [_serialize(dict(row)) for row in rows]
     finally:
         conn.close()
+
+def get_turf_location(turf_field_id: str) -> dict:
+    import httpx
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            text("SELECT turf_address, turf_name FROM turf_fields WHERE turf_field_id = :turf_field_id"),
+            {"turf_field_id": turf_field_id}
+        ).fetchone()
+
+        if not row:
+            raise Exception("Turf not found")
+
+        response = httpx.get(
+            "https://nominatim.openstreetmap.org/search",
+            params={"q": row.turf_address, "format": "json", "limit": 1},
+            headers={"User-Agent": "tikito-app"}
+        )
+        data = response.json()
+        if not data:
+            return {"error": "Could not geocode address", "address": row.turf_address}
+
+        return {
+            "turf_name": row.turf_name,
+            "address": row.turf_address,
+            "latitude": data[0]["lat"],
+            "longitude": data[0]["lon"]
+        }
+    finally:
+        conn.close()

@@ -105,7 +105,7 @@ def add_turf(data: AddTurfSchema, current_user: dict = Depends(get_current_user)
     return vendor_service.add_turf(data.model_dump(), current_user)
 
 @router.put("/edit-turf/{turf_field_id}")
-def edit_turf(turf_field_id: str, data: EditTurfSchema, current_user: dict = Depends(get_current_user)):
+def edit_turf(turf_field_id: str,  data: EditTurfSchema, current_user: dict = Depends(get_current_user)):
     return vendor_service.edit_turf(turf_field_id, data.model_dump(exclude_none=True), current_user)
 
 @router.post("/add-ground", status_code=201)
@@ -123,3 +123,7 @@ def get_my_turfs(current_user: dict = Depends(get_current_user)):
 @router.get("/turf/{turf_field_id}/grounds", response_model=list[GroundResponseSchema])
 def get_grounds_by_turf(turf_field_id: str, current_user: dict = Depends(get_current_user)):
     return vendor_service.get_grounds_by_turf(turf_field_id)
+
+@router.get("/turf/{turf_field_id}/location")
+def get_turf_location(turf_field_id: str):
+    return vendor_service.get_turf_location(turf_field_id)

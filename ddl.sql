@@ -13,12 +13,13 @@ CREATE TABLE public.admins (
 	CONSTRAINT admins_pkey PRIMARY KEY (admin_id)
 );
 
+
 CREATE TABLE public.users (
 	user_id uuid DEFAULT gen_random_uuid() NOT NULL,
 	full_name varchar NOT NULL,
 	phone_no varchar NOT NULL,
 	email varchar NULL,
-	password_hash text NOT NULL,
+	"password" text NOT NULL,
 	is_active bool DEFAULT true NULL,
 	is_verified bool DEFAULT false NULL,
 	created_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
