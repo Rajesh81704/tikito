@@ -173,6 +173,9 @@ def edit_ground(turf_ground_id: str, data: dict, current_user: dict) -> dict:
         conn.rollback()
         raise e
 
+def _serialize(row: dict) -> dict:
+    return {k: str(v) if hasattr(v, 'hex') else v for k, v in row.items()}
+
 def get_turfs_by_vendor(current_user: dict) -> list:
     conn = get_connection()
     try:
@@ -181,7 +184,7 @@ def get_turfs_by_vendor(current_user: dict) -> list:
             {"vendor_id": current_user.get("sub")}
         )
         rows = result.mappings().all()
-        return [dict(row) for row in rows]
+        return [_serialize(dict(row)) for row in rows]
     finally:
         conn.close()
 
@@ -209,6 +212,6 @@ def get_grounds_by_turf(turf_field_id: str) -> list:
             {"turf_field_id": turf_field_id}
         )
         rows = result.mappings().all()
-        return [dict(row) for row in rows]
+        return [_serialize(dict(row)) for row in rows]
     finally:
         conn.close()
