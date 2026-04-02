@@ -22,8 +22,8 @@ def add_turf(data: dict, current_user: dict) -> dict:
         vendor_id = current_user.get("sub")
         print(vendor_id)
         query = text("""
-        INSERT INTO turf_fields (turf_name, turf_location, turf_address, no_of_grounds, vendor_id, turf_facilities, turf_rules)
-        VALUES (:turf_name, :turf_location, :turf_address, :no_of_grounds, :vendor_id, :turf_facilities, :turf_rules)
+        INSERT INTO turf_fields (turf_name, turf_location, turf_address, no_of_grounds, vendor_id, turf_facilities, turf_rules, latitude, longitude)
+        VALUES (:turf_name, :turf_location, :turf_address, :no_of_grounds, :vendor_id, :turf_facilities, :turf_rules, :latitude, :longitude)
         RETURNING turf_field_id
         """)
         result = conn.execute(query, {
@@ -33,7 +33,9 @@ def add_turf(data: dict, current_user: dict) -> dict:
             "no_of_grounds": data.get("no_of_grounds"),
             "vendor_id": vendor_id,
             "turf_facilities": data.get("turf_facilities"),
-            "turf_rules": data.get("turf_rules")
+            "turf_rules": data.get("turf_rules"),
+            "latitude": data.get("latitude"),
+            "longitude": data.get("longitude")
         })
         conn.commit()
         turf_field_id = result.fetchone()[0]
@@ -56,38 +58,43 @@ def add_ground(data: dict, current_user: dict) -> dict:
         
         result = conn.execute(
             text("""
-                INSERT INTO turf_grounds (ground_name, ground_loc, ground_type, turf_field_id)
-                VALUES (:ground_name, :ground_loc, :ground_type, :turf_field_id)
+                INSERT INTO turf_grounds (ground_name, ground_loc, ground_type, turf_field_id, booking_weeks)
+                VALUES (:ground_name, :ground_loc, :ground_type, :turf_field_id, :booking_weeks)
                 RETURNING turf_ground_id
             """),
             {
                 "ground_name": data.get("ground_name"),
                 "ground_loc": data.get("ground_loc"),
                 "ground_type": data.get("ground_type"),
-                "turf_field_id": data.get("turf_field_id")
+                "turf_field_id": data.get("turf_field_id"),
+                "booking_weeks": data.get("booking_weeks", 1)
             }
         ) 
         turf_ground_id = result.fetchone()[0]
-        
-        slots = data.get("slots", [])
-        for slot in slots:
-            conn.execute(
-                text("""
-                    INSERT INTO turf_slots (turf_ground_id, day_of_week, start_time, end_time, price, is_peak)
-                    VALUES (:turf_ground_id, :day_of_week, :start_time, :end_time, :price, :is_peak)
-                """),
-                {
-                    "turf_ground_id": str(turf_ground_id),
-                    "day_of_week": slot.get("day_of_week"),
-                    "start_time": slot.get("start_time"),
-                    "end_time": slot.get("end_time"),
-                    "price": slot.get("price"),
-                    "is_peak": slot.get("is_peak", False)
-                }
-            )
+
+        schedule = data.get("schedule", [])
+        total_slots = 0
+        for day_entry in schedule:
+            day_of_week = day_entry.get("day_of_week")
+            for slot in day_entry.get("slots", []):
+                conn.execute(
+                    text("""
+                        INSERT INTO turf_slots (turf_ground_id, day_of_week, start_time, end_time, price, is_peak)
+                        VALUES (:turf_ground_id, :day_of_week, :start_time, :end_time, :price, :is_peak)
+                    """),
+                    {
+                        "turf_ground_id": str(turf_ground_id),
+                        "day_of_week": day_of_week,
+                        "start_time": slot.get("start_time"),
+                        "end_time": slot.get("end_time"),
+                        "price": slot.get("price"),
+                        "is_peak": slot.get("is_peak", False)
+                    }
+                )
+                total_slots += 1
 
         conn.commit()
-        return {"turf_ground_id": str(turf_ground_id), "slots_added": len(slots)}
+        return {"turf_ground_id": str(turf_ground_id), "slots_added": total_slots}
 
     except Exception as e:
         conn.rollback()
@@ -96,7 +103,7 @@ def add_ground(data: dict, current_user: dict) -> dict:
 def edit_turf(turf_field_id: str, data: dict, current_user: dict) -> dict:
     conn = get_connection()
     try:
-        allowed = {"turf_name", "turf_location", "turf_address", "no_of_grounds", "turf_facilities", "turf_rules"}
+        allowed = {"turf_name", "turf_location", "turf_address", "no_of_grounds", "turf_facilities", "turf_rules", "latitude", "longitude"}
         fields = {k: v for k, v in data.items() if k in allowed}
         if not fields:
             raise Exception("No valid fields to update")
@@ -127,7 +134,7 @@ def edit_turf(turf_field_id: str, data: dict, current_user: dict) -> dict:
 def edit_ground(turf_ground_id: str, data: dict, current_user: dict) -> dict:
     conn = get_connection()
     try:
-        allowed = {"ground_name", "ground_loc", "ground_type"}
+        allowed = {"ground_name", "ground_loc", "ground_type", "booking_weeks"}
         fields = {k: v for k, v in data.items() if k in allowed}
 
         if fields:
@@ -145,27 +152,29 @@ def edit_ground(turf_ground_id: str, data: dict, current_user: dict) -> dict:
             if not result.fetchone():
                 raise Exception("Ground not found")
 
-        slots = data.get("slots")
+        slots = data.get("schedule")
         if slots is not None:
             conn.execute(
                 text("DELETE FROM turf_slots WHERE turf_ground_id = :turf_ground_id"),
                 {"turf_ground_id": turf_ground_id}
             )
-            for slot in slots:
-                conn.execute(
-                    text("""
-                        INSERT INTO turf_slots (turf_ground_id, day_of_week, start_time, end_time, price, is_peak)
-                        VALUES (:turf_ground_id, :day_of_week, :start_time, :end_time, :price, :is_peak)
-                    """),
-                    {
-                        "turf_ground_id": turf_ground_id,
-                        "day_of_week": slot.get("day_of_week"),
-                        "start_time": slot.get("start_time"),
-                        "end_time": slot.get("end_time"),
-                        "price": slot.get("price"),
-                        "is_peak": slot.get("is_peak", False)
-                    }
-                )
+            for day_entry in slots:
+                day_of_week = day_entry.get("day_of_week")
+                for slot in day_entry.get("slots", []):
+                    conn.execute(
+                        text("""
+                            INSERT INTO turf_slots (turf_ground_id, day_of_week, start_time, end_time, price, is_peak)
+                            VALUES (:turf_ground_id, :day_of_week, :start_time, :end_time, :price, :is_peak)
+                        """),
+                        {
+                            "turf_ground_id": turf_ground_id,
+                            "day_of_week": day_of_week,
+                            "start_time": slot.get("start_time"),
+                            "end_time": slot.get("end_time"),
+                            "price": slot.get("price"),
+                            "is_peak": slot.get("is_peak", False)
+                        }
+                    )
 
         conn.commit()
         return {"turf_ground_id": turf_ground_id, "message": "Ground updated successfully"}

@@ -1,3 +1,4 @@
+
 CREATE TABLE public.admins (
 	admin_id uuid DEFAULT gen_random_uuid() NOT NULL,
 	full_name varchar NOT NULL,
@@ -29,6 +30,7 @@ CREATE TABLE public.users (
 	CONSTRAINT users_pkey PRIMARY KEY (user_id)
 );
 
+
 CREATE TABLE public.vendors (
 	vendor_id uuid DEFAULT gen_random_uuid() NOT NULL,
 	is_active bool DEFAULT true NULL,
@@ -36,13 +38,15 @@ CREATE TABLE public.vendors (
 	vendor_phone_no varchar NULL,
 	vendor_email_id varchar NULL,
 	vendor_address text NULL,
-	password text NOT NULL,
 	created_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
 	updated_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
+	"password" varchar NULL,
+	is_verified bool DEFAULT false NULL,
 	CONSTRAINT vendors_pkey PRIMARY KEY (vendor_id),
 	CONSTRAINT vendors_vendor_email_id_key UNIQUE (vendor_email_id),
 	CONSTRAINT vendors_vendor_phone_no_key UNIQUE (vendor_phone_no)
 );
+
 
 CREATE TABLE public.turf_fields (
 	turf_field_id uuid DEFAULT gen_random_uuid() NOT NULL,
@@ -57,8 +61,12 @@ CREATE TABLE public.turf_fields (
 	turf_facilities text NULL,
 	turf_rules text NULL,
 	turf_images text NULL,
-	CONSTRAINT turf_fields_pkey PRIMARY KEY (turf_field_id)
+	latitude numeric(9, 6) NULL,
+	longitude numeric(9, 6) NULL,
+	CONSTRAINT turf_fields_pkey PRIMARY KEY (turf_field_id),
+	CONSTRAINT turf_fields_vendor_id_fkey FOREIGN KEY (vendor_id) REFERENCES public.vendors(vendor_id) ON DELETE CASCADE
 );
+
 
 CREATE TABLE public.turf_grounds (
 	turf_ground_id uuid DEFAULT gen_random_uuid() NOT NULL,
@@ -66,23 +74,26 @@ CREATE TABLE public.turf_grounds (
 	ground_loc text NULL,
 	ground_type varchar NULL,
 	turf_field_id uuid NOT NULL,
+	booking_weeks int DEFAULT 1 NOT NULL,
 	created_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
 	updated_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
 	ground_images text NULL,
-	CONSTRAINT turf_grounds_pkey PRIMARY KEY (turf_ground_id)
+	is_active bool DEFAULT true NULL,
+	CONSTRAINT turf_grounds_pkey PRIMARY KEY (turf_ground_id),
+	CONSTRAINT turf_grounds_turf_field_id_fkey FOREIGN KEY (turf_field_id) REFERENCES public.turf_fields(turf_field_id) ON DELETE CASCADE
 );
 
 
 CREATE TABLE public.turf_slots (
 	slot_id uuid DEFAULT gen_random_uuid() NOT NULL,
 	turf_ground_id uuid NOT NULL,
-	day_of_week varchar NOT NULL,
 	start_time time NOT NULL,
 	end_time time NOT NULL,
 	price numeric(10, 2) NOT NULL,
 	is_peak bool DEFAULT false NULL,
 	created_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
 	updated_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
+	day_of_week varchar NOT NULL,
 	CONSTRAINT turf_slots_pkey PRIMARY KEY (slot_id),
 	CONSTRAINT unique_slot UNIQUE (turf_ground_id, day_of_week, start_time),
 	CONSTRAINT turf_slots_turf_ground_id_fkey FOREIGN KEY (turf_ground_id) REFERENCES public.turf_grounds(turf_ground_id) ON DELETE CASCADE
@@ -96,6 +107,7 @@ CREATE TABLE public.bookings (
 	booking_status varchar DEFAULT 'CONFIRMED'::character varying NULL,
 	booked_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
 	CONSTRAINT bookings_pkey PRIMARY KEY (booking_id),
+	CONSTRAINT unique_booking UNIQUE (slot_id, booking_date),
 	CONSTRAINT bookings_slot_id_fkey FOREIGN KEY (slot_id) REFERENCES public.turf_slots(slot_id) ON DELETE CASCADE
 );
 CREATE INDEX idx_bookings_slot ON public.bookings USING btree (slot_id);

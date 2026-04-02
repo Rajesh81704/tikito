@@ -29,3 +29,5 @@ def me(current_user: dict = Depends(get_current_user)):
 @router.get("/test-auth")
 def test_auth(current_user: dict = Depends(get_current_user)):
     return {"authenticated": True, "user": current_user}
+
+
