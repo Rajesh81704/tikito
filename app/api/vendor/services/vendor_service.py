@@ -45,17 +45,16 @@ def add_turf(data: dict, current_user: dict) -> dict:
         conn.rollback()
         raise e
 
-def add_ground(data: dict, current_user: dict) -> dict:
+def add_ground(turf_field_id: str, data: dict, current_user: dict) -> dict:
     conn = get_connection()
     try:
         check_turf = conn.execute(
             text("SELECT 1 FROM turf_fields WHERE turf_field_id = :turf_field_id"),
-            {"turf_field_id": data.get("turf_field_id")}
+            {"turf_field_id": turf_field_id}
         )
-
         if not check_turf.fetchone():
             raise Exception("Invalid turf")
-        
+
         result = conn.execute(
             text("""
                 INSERT INTO turf_grounds (ground_name, ground_loc, ground_type, turf_field_id, booking_weeks)
@@ -66,35 +65,13 @@ def add_ground(data: dict, current_user: dict) -> dict:
                 "ground_name": data.get("ground_name"),
                 "ground_loc": data.get("ground_loc"),
                 "ground_type": data.get("ground_type"),
-                "turf_field_id": data.get("turf_field_id"),
+                "turf_field_id": turf_field_id,
                 "booking_weeks": data.get("booking_weeks", 1)
             }
-        ) 
+        )
         turf_ground_id = result.fetchone()[0]
-
-        schedule = data.get("schedule", [])
-        total_slots = 0
-        for day_entry in schedule:
-            day_of_week = day_entry.get("day_of_week")
-            for slot in day_entry.get("slots", []):
-                conn.execute(
-                    text("""
-                        INSERT INTO turf_slots (turf_ground_id, day_of_week, start_time, end_time, price, is_peak)
-                        VALUES (:turf_ground_id, :day_of_week, :start_time, :end_time, :price, :is_peak)
-                    """),
-                    {
-                        "turf_ground_id": str(turf_ground_id),
-                        "day_of_week": day_of_week,
-                        "start_time": slot.get("start_time"),
-                        "end_time": slot.get("end_time"),
-                        "price": slot.get("price"),
-                        "is_peak": slot.get("is_peak", False)
-                    }
-                )
-                total_slots += 1
-
         conn.commit()
-        return {"turf_ground_id": str(turf_ground_id), "slots_added": total_slots}
+        return {"turf_ground_id": str(turf_ground_id)}
 
     except Exception as e:
         conn.rollback()

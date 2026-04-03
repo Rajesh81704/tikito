@@ -62,9 +62,11 @@ class AddGroundSchema(BaseModel):
     ground_name: str
     ground_loc: str | None = None
     ground_type: str | None = None
-    turf_field_id: str
     booking_weeks: int = 1
-    schedule: list[DaySlotSchema] = []
+
+class GroundBookingScheduleSchema(BaseModel):
+    turf_ground_id: str
+    schedule: list[DaySlotSchema]
 
 class EditGroundSchema(BaseModel):
     ground_name: str | None = None
@@ -108,10 +110,10 @@ class GroundResponseSchema(BaseModel):
     is_active: bool | None = None
     slots: list[SlotResponseSchema] = []
 
+
 @router.post("/signup", status_code=201) 
 async def signup(data: VendorSignupSchema):
     return vendor_auth_service.signup(data.model_dump())
-
 
 @router.post("/add-turf", status_code=201)
 async def add_turf(data: AddTurfSchema, current_user: dict = Depends(get_current_user)):
@@ -121,13 +123,21 @@ async def add_turf(data: AddTurfSchema, current_user: dict = Depends(get_current
 async def edit_turf(turf_field_id: str,  data: EditTurfSchema, current_user: dict = Depends(get_current_user)):
     return vendor_service.edit_turf(turf_field_id, data.model_dump(exclude_none=True), current_user)
 
-@router.post("/add-ground", status_code=201)
-async def add_ground(data: AddGroundSchema, current_user: dict = Depends(get_current_user)):
-    return vendor_service.add_ground(data.model_dump(), current_user)
+@router.post("/turf/{turf_field_id}/add-ground", status_code=201)
+async def add_ground(turf_field_id: str, data: AddGroundSchema, current_user: dict = Depends(get_current_user)):
+    return vendor_service.add_ground(turf_field_id, data.model_dump(), current_user)
 
 @router.put("/edit-ground/{turf_ground_id}")
 async def edit_ground(turf_ground_id: str, data: EditGroundSchema, current_user: dict = Depends(get_current_user)):
     return vendor_service.edit_ground(turf_ground_id, data.model_dump(exclude_none=True), current_user)
+
+@router.post("/ground-booking-schedule", status_code=201)
+async def set_ground_booking_schedule(data: GroundBookingScheduleSchema, current_user: dict = Depends(get_current_user)):
+    return vendor_service.set_ground_booking_schedule(data.model_dump())
+
+@router.put("/ground-booking-schedule/{turf_ground_id}")turf_ground_id
+async def update_ground_booking_schedule(turf_ground_id: str, data: list[DaySlotSchema], current_user: dict = Depends(get_current_user)):
+    return vendor_service.set_ground_booking_schedule({"turf_ground_id": , "schedule": [s.model_dump() for s in data]})
 
 @router.get("/my-turfs", response_model=list[TurfResponseSchema])
 async def get_my_turfs(current_user: dict = Depends(get_current_user)):

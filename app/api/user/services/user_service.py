@@ -115,7 +115,7 @@ def get_available_slots(turf_ground_id: str) -> list:
 
         booking_weeks = ground.booking_weeks
         today = date.today()
-        end_date = today + timedelta(weeks=booking_weeks)
+        end_date = today + timedelta(days=(booking_weeks * 7) - 1)
 
         # Get all slot templates for this ground
         slots = conn.execute(
