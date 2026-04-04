@@ -180,15 +180,18 @@ def get_grounds_by_turf(turf_field_id: str) -> list:
         result = conn.execute(
             text("""
                 SELECT g.*, 
-                       json_agg(
-                           json_build_object(
-                               'slot_id', s.slot_id,
-                               'day_of_week', s.day_of_week,
-                               'start_time', s.start_time,
-                               'end_time', s.end_time,
-                               'price', s.price,
-                               'is_peak', s.is_peak
-                           ) ORDER BY s.day_of_week, s.start_time
+                       COALESCE(
+                           json_agg(
+                               json_build_object(
+                                   'slot_id', s.slot_id,
+                                   'day_of_week', s.day_of_week,
+                                   'start_time', s.start_time,
+                                   'end_time', s.end_time,
+                                   'price', s.price,
+                                   'is_peak', s.is_peak
+                               ) ORDER BY s.day_of_week, s.start_time
+                           ) FILTER (WHERE s.slot_id IS NOT NULL),
+                           '[]'
                        ) AS slots
                 FROM turf_grounds g
                 LEFT JOIN turf_slots s ON s.turf_ground_id = g.turf_ground_id
