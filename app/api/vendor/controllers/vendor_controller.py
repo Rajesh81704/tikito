@@ -137,7 +137,7 @@ async def set_ground_booking_schedule(data: GroundBookingScheduleSchema, current
 
 @router.put("/ground-booking-schedule/{turf_ground_id}")
 async def update_ground_booking_schedule(turf_ground_id: str, data: list[DaySlotSchema], current_user: dict = Depends(get_current_user)):
-    return vendor_service.set_ground_booking_schedule({"turf_ground_id": turf_ground_id, "schedule": [s.model_dump() for s in data]})
+    return vendor_service.update_ground_schedule(turf_ground_id, [s.model_dump() for s in data])
 
 @router.get("/my-turfs", response_model=list[TurfResponseSchema])
 async def get_my_turfs(current_user: dict = Depends(get_current_user)):

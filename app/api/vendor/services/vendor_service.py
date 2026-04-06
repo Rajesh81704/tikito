@@ -239,6 +239,7 @@ def set_ground_booking_schedule(data: dict) -> dict:
     conn = get_connection()
     try:
         turf_ground_id = data.get("turf_ground_id")
+        booking_weeks = data.get("booking_weeks", 1)
 
         ground = conn.execute(
             text("SELECT turf_ground_id FROM turf_grounds WHERE turf_ground_id = :id"),
@@ -246,6 +247,12 @@ def set_ground_booking_schedule(data: dict) -> dict:
         ).fetchone()
         if not ground:
             raise Exception("Ground not found")
+
+        # Update booking_weeks
+        conn.execute(
+            text("UPDATE turf_grounds SET booking_weeks = :booking_weeks WHERE turf_ground_id = :id"),
+            {"booking_weeks": booking_weeks, "id": turf_ground_id}
+        )
 
         conn.execute(
             text("DELETE FROM turf_slots WHERE turf_ground_id = :id"),
@@ -273,7 +280,44 @@ def set_ground_booking_schedule(data: dict) -> dict:
                 slot_count += 1
 
         conn.commit()
-        return {"turf_ground_id": turf_ground_id, "slots_created": slot_count}
+        return {"turf_ground_id": turf_ground_id, "booking_weeks": booking_weeks, "slots_created": slot_count}
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
+
+def update_ground_schedule(turf_ground_id: str, schedule: list) -> dict:
+    conn = get_connection()
+    try:
+        conn.execute(
+            text("DELETE FROM turf_slots WHERE turf_ground_id = :id"),
+            {"id": turf_ground_id}
+        )
+
+        slot_count = 0
+        for day_entry in schedule:
+            day_of_week = day_entry.get("day_of_week")
+            for slot in day_entry.get("slots", []):
+                conn.execute(
+                    text("""
+                        INSERT INTO turf_slots (turf_ground_id, day_of_week, start_time, end_time, price, is_peak)
+                        VALUES (:turf_ground_id, :day_of_week, :start_time, :end_time, :price, :is_peak)
+                    """),
+                    {
+                        "turf_ground_id": turf_ground_id,
+                        "day_of_week": day_of_week,
+                        "start_time": slot.get("start_time"),
+                        "end_time": slot.get("end_time"),
+                        "price": slot.get("price"),
+                        "is_peak": slot.get("is_peak", False)
+                    }
+                )
+                slot_count += 1
+
+        conn.commit()
+        return {"turf_ground_id": turf_ground_id, "slots_updated": slot_count}
     except Exception as e:
         conn.rollback()
         raise e
