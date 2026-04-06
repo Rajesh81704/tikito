@@ -337,7 +337,7 @@ def get_vendor_bookings(current_user: dict) -> list:
                 JOIN turf_slots s ON s.slot_id = b.slot_id
                 JOIN turf_grounds g ON g.turf_ground_id = s.turf_ground_id
                 JOIN turf_fields tf ON tf.turf_field_id = g.turf_field_id
-                WHERE tf.vendor_id = '085c6cc4-90d5-437d-9861-ed2d5e7bc5d0'
+                WHERE tf.vendor_id = :vendor_id
                 AND b.is_available = true
                 ORDER BY b.booking_date DESC
             """),
