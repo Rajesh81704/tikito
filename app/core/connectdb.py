@@ -10,7 +10,13 @@ DB_URL = (
     f"?sslmode={os.getenv('DB_SSLMODE')}"
 )
 
-engine = create_engine(DB_URL)
+engine = create_engine(
+    DB_URL,
+    pool_pre_ping=True,
+    pool_recycle=300,
+    pool_size=5,
+    max_overflow=10
+)
 
 def get_connection():
     return engine.connect()

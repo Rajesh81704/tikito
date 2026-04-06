@@ -210,8 +210,8 @@ def book_slot(data: dict, current_user: dict) -> dict:
         # Insert booking
         result = conn.execute(
             text("""
-                INSERT INTO bookings (slot_id, user_id, booking_date, booking_status)
-                VALUES (:slot_id, :user_id, :booking_date, 'CONFIRMED')
+                INSERT INTO bookings (slot_id, user_id, booking_date, booking_status, is_available)
+                VALUES (:slot_id, :user_id, :booking_date, 'CONFIRMED', false)
                 RETURNING booking_id
             """),
             {"slot_id": slot_id, "user_id": user_id, "booking_date": booking_date}
@@ -223,5 +223,31 @@ def book_slot(data: dict, current_user: dict) -> dict:
     except Exception as e:
         conn.rollback()
         raise e
+    finally:
+        conn.close()
+
+def get_my_bookings(current_user: dict) -> list:
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            text("""
+                SELECT b.booking_id, b.booking_date, b.booking_status, b.is_available, b.booked_at,
+                       s.start_time, s.end_time, s.price, s.day_of_week,
+                       g.ground_name, g.ground_type,
+                       tf.turf_name, tf.turf_address
+                FROM bookings b
+                JOIN turf_slots s ON s.slot_id = b.slot_id
+                JOIN turf_grounds g ON g.turf_ground_id = s.turf_ground_id
+                JOIN turf_fields tf ON tf.turf_field_id = g.turf_field_id
+                WHERE b.user_id = :user_id
+                AND b.is_available = false
+                ORDER BY b.booking_date DESC
+            """),
+            {"user_id": current_user.get("sub")}
+        ).mappings().all()
+        return [
+            {k: str(v) if hasattr(v, 'hex') else v for k, v in dict(row).items()}
+            for row in rows
+        ]
     finally:
         conn.close()

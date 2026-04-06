@@ -46,6 +46,11 @@ class GroundResponseSchema(BaseModel):
     is_active: bool | None = None
     slots: list[SlotResponseSchema] = []
 
+
+class BookSlotSchema(BaseModel):
+    slot_id: str
+    booking_date: str
+
 @router.post("/sign-up", status_code=201)
 def sign_up(data: CreateUser):
     return user_service.create(data.model_dump())
@@ -66,10 +71,10 @@ def get_turf_ground_details(turf_id: str, current_user: dict = Depends(get_curre
 def get_available_slots(turf_ground_id: str, current_user: dict = Depends(get_current_user)):
     return user_service.get_available_slots(turf_ground_id)
 
-class BookSlotSchema(BaseModel):
-    slot_id: str
-    booking_date: str  # YYYY-MM-DD
-
 @router.post("/book", status_code=201)
 def book_slot(data: BookSlotSchema, current_user: dict = Depends(get_current_user)):
     return user_service.book_slot(data.model_dump(), current_user)
+
+@router.get("/my-bookings")
+def get_my_bookings(current_user: dict = Depends(get_current_user)):
+    return user_service.get_my_bookings(current_user)

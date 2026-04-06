@@ -323,3 +323,31 @@ def update_ground_schedule(turf_ground_id: str, schedule: list) -> dict:
         raise e
     finally:
         conn.close()
+
+def get_vendor_bookings(current_user: dict) -> list:
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            text("""
+                SELECT b.booking_id, b.booking_date, b.booking_status, b.is_available, b.booked_at,
+                       s.start_time, s.end_time, s.price, s.day_of_week,
+                       g.ground_name, g.ground_type,
+                       tf.turf_name, tf.turf_address
+                FROM bookings b
+                JOIN turf_slots s ON s.slot_id = b.slot_id
+                JOIN turf_grounds g ON g.turf_ground_id = s.turf_ground_id
+                JOIN turf_fields tf ON tf.turf_field_id = g.turf_field_id
+                WHERE tf.vendor_id = '085c6cc4-90d5-437d-9861-ed2d5e7bc5d0'
+                AND b.is_available = true
+                ORDER BY b.booking_date DESC
+            """),
+            {"vendor_id": current_user.get("sub")}
+        ).mappings().all()
+
+        print(current_user.get("sub"))
+        return [
+            {k: str(v) if hasattr(v, 'hex') else v for k, v in dict(row).items()}
+            for row in rows
+        ]
+    finally:
+        conn.close()

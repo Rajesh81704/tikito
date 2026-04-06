@@ -105,6 +105,7 @@ CREATE TABLE public.bookings (
 	slot_id uuid NOT NULL,
 	user_id uuid NULL,
 	booking_status varchar DEFAULT 'CONFIRMED'::character varying NULL,
+	is_available bool DEFAULT true NULL,
 	booked_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
 	CONSTRAINT bookings_pkey PRIMARY KEY (booking_id),
 	CONSTRAINT unique_booking UNIQUE (slot_id, booking_date),
