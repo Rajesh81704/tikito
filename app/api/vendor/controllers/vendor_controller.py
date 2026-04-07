@@ -110,6 +110,20 @@ class GroundResponseSchema(BaseModel):
     is_active: bool | None = None
     slots: list[SlotResponseSchema] = []
 
+class BookingResponseSchema(BaseModel):
+    booking_id: UUID
+    booking_date: date
+    booking_status: str
+    is_available: bool
+    booked_at: datetime
+    start_time: time
+    end_time: time
+    price: Decimal
+    day_of_week: str
+    ground_name: str
+    ground_type: str | None = None
+    turf_name: str
+    turf_address: str | None = None
 
 @router.post("/signup", status_code=201) 
 async def signup(data: VendorSignupSchema):
@@ -151,21 +165,23 @@ async def get_grounds_by_turf(turf_field_id: str, current_user: dict = Depends(g
 async def get_turf_location(turf_field_id: str):
     return vendor_service.get_turf_location(turf_field_id)
 
-class BookingResponseSchema(BaseModel):
-    booking_id: UUID
-    booking_date: date
-    booking_status: str
-    is_available: bool
-    booked_at: datetime
-    start_time: time
-    end_time: time
-    price: Decimal
-    day_of_week: str
-    ground_name: str
-    ground_type: str | None = None
-    turf_name: str
-    turf_address: str | None = None
-
 @router.get("/bookings", response_model=list[BookingResponseSchema])
 async def get_vendor_bookings(current_user: dict = Depends(get_current_user)):
     return vendor_service.get_vendor_bookings(current_user)
+
+class VendorDashboardSchema(BaseModel):
+    total_bookings: int
+    confirmed_bookings: int
+    cancelled_bookings: int
+    total_earnings: Decimal
+    total_turfs: int
+    total_grounds: int
+
+@router.get("/dashboard", response_model=VendorDashboardSchema)
+async def get_vendor_dashboard(current_user: dict = Depends(get_current_user)):
+    return vendor_service.get_vendor_dashboard(current_user)
+
+@router.put("/bookings/{booking_id}/cancel")
+async def cancel_booking(booking_id: str, current_user: dict = Depends(get_current_user)):
+    return vendor_service.cancel_booking(booking_id, current_user)
+

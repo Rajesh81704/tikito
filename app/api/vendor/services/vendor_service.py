@@ -287,7 +287,6 @@ def set_ground_booking_schedule(data: dict) -> dict:
     finally:
         conn.close()
 
-
 def update_ground_schedule(turf_ground_id: str, schedule: list) -> dict:
     conn = get_connection()
     try:
@@ -349,5 +348,66 @@ def get_vendor_bookings(current_user: dict) -> list:
             {k: str(v) if hasattr(v, 'hex') else v for k, v in dict(row).items()}
             for row in rows
         ]
+    finally:
+        conn.close()
+
+def get_vendor_dashboard(current_user: dict) -> dict:
+    conn = get_connection()
+    try:
+        vendor_id = current_user.get("sub")
+
+        summary = conn.execute(
+            text("""
+                SELECT
+                    COUNT(b.booking_id) AS total_bookings,
+                    COUNT(CASE WHEN b.booking_status = 'CONFIRMED' THEN 1 END) AS confirmed_bookings,
+                    COUNT(CASE WHEN b.booking_status = 'CANCELLED' THEN 1 END) AS cancelled_bookings,
+                    COALESCE(SUM(CASE WHEN b.booking_status = 'CONFIRMED' THEN s.price ELSE 0 END), 0) AS total_earnings,
+                    COUNT(DISTINCT tf.turf_field_id) AS total_turfs,
+                    COUNT(DISTINCT g.turf_ground_id) AS total_grounds
+                FROM turf_fields tf
+                LEFT JOIN turf_grounds g ON g.turf_field_id = tf.turf_field_id
+                LEFT JOIN turf_slots s ON s.turf_ground_id = g.turf_ground_id
+                LEFT JOIN bookings b ON b.slot_id = s.slot_id
+                WHERE tf.vendor_id = :vendor_id
+            """),
+            {"vendor_id": vendor_id}
+        ).mappings().fetchone()
+
+        return dict(summary)
+    finally:
+        conn.close()
+
+
+def cancel_booking(booking_id: str, current_user: dict) -> dict:
+    conn = get_connection()
+    try:
+        booking = conn.execute(
+            text("""
+                SELECT b.booking_id FROM bookings b
+                JOIN turf_slots s ON s.slot_id = b.slot_id
+                JOIN turf_grounds g ON g.turf_ground_id = s.turf_ground_id
+                JOIN turf_fields tf ON tf.turf_field_id = g.turf_field_id
+                WHERE b.booking_id = :booking_id
+                AND tf.vendor_id = :vendor_id
+            """),
+            {"booking_id": booking_id, "vendor_id": current_user.get("sub")}
+        ).fetchone()
+
+        if not booking:
+            raise Exception("Booking not found or unauthorized")
+        conn.execute(
+            text("""
+                UPDATE bookings
+                SET booking_status = 'CANCELLED', is_available = false
+                WHERE booking_id = :booking_id
+            """),
+            {"booking_id": booking_id}
+        )
+        conn.commit()
+        return {"booking_id": booking_id, "message": "Booking cancelled successfully"}
+    except Exception as e:
+        conn.rollback()
+        raise e
     finally:
         conn.close()
