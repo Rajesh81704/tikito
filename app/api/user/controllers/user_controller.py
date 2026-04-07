@@ -49,7 +49,6 @@ class GroundResponseSchema(BaseModel):
 
 class BookSlotSchema(BaseModel):
     slot_id: str
-    booking_date: str
 
 @router.post("/sign-up", status_code=201)
 def sign_up(data: CreateUser):
