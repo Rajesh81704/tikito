@@ -42,3 +42,38 @@ def logout() -> dict:
 
 def refresh_token(data: dict) -> dict:
     return {}
+
+def get_me(current_user: dict) -> dict:
+    from sqlalchemy import text
+    from app.core.connectdb import get_connection
+
+    role = current_user.get("role")
+    user_id = current_user.get("sub")
+
+    ROLE_QUERY = {
+        "user": (
+            "SELECT user_id, full_name, phone_no, email, is_active, is_verified, created_at FROM users WHERE user_id = :id AND is_active = true",
+            "user_id"
+        ),
+        "vendor": (
+            "SELECT vendor_id, vendor_full_name, vendor_phone_no, vendor_email_id, vendor_address, is_active, created_at FROM vendors WHERE vendor_id = :id AND is_active = true",
+            "vendor_id"
+        ),
+        "admin": (
+            "SELECT admin_id, full_name, email, phone_no, role, is_active, created_at FROM admins WHERE admin_id = :id AND is_active = true",
+            "admin_id"
+        ),
+    }
+
+    if role not in ROLE_QUERY:
+        raise Exception("Invalid role")
+
+    query, _ = ROLE_QUERY[role]
+    conn = get_connection()
+    try:
+        row = conn.execute(text(query), {"id": user_id}).mappings().fetchone()
+        if not row:
+            raise Exception("User not found")
+        return {k: str(v) if hasattr(v, 'hex') else v for k, v in dict(row).items()}
+    finally:
+        conn.close()

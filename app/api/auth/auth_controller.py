@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
+from uuid import UUID
+from datetime import datetime
 from app.api.auth import auth_service
 from app.api.core.dependencies import get_current_user
 
@@ -9,6 +11,33 @@ class LoginSchema(BaseModel):
     identifier: str  # phone or email
     password: str
     role: str  # "user" | "admin" | "vendor"
+
+class UserMeSchema(BaseModel):
+    user_id: UUID
+    full_name: str
+    phone_no: str
+    email: str | None = None
+    is_active: bool
+    is_verified: bool
+    created_at: datetime
+
+class VendorMeSchema(BaseModel):
+    vendor_id: UUID
+    vendor_full_name: str
+    vendor_phone_no: str | None = None
+    vendor_email_id: str | None = None
+    vendor_address: str | None = None
+    is_active: bool
+    created_at: datetime
+
+class AdminMeSchema(BaseModel):
+    admin_id: UUID
+    full_name: str
+    email: str
+    phone_no: str | None = None
+    role: str | None = None
+    is_active: bool
+    created_at: datetime
 
 @router.post("/login")
 def login(data: LoginSchema):
@@ -24,7 +53,7 @@ def refresh(data: dict):
 
 @router.get("/me")
 def me(current_user: dict = Depends(get_current_user)):
-    return current_user
+    return auth_service.get_me(current_user)
 
 @router.get("/test-auth")
 def test_auth(current_user: dict = Depends(get_current_user)):

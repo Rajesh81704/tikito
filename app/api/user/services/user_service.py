@@ -226,3 +226,18 @@ def get_my_bookings(current_user: dict) -> list:
         ]
     finally:
         conn.close()
+
+def soft_delete_user(current_user: dict) -> dict:
+    conn = get_connection()
+    try:
+        conn.execute(
+            text("UPDATE users SET is_active = false WHERE user_id = :user_id"),
+            {"user_id": current_user.get("sub")}
+        )
+        conn.commit()
+        return {"message": "Account deactivated successfully"}
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()

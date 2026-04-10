@@ -77,3 +77,7 @@ def book_slot(data: BookSlotSchema, current_user: dict = Depends(get_current_use
 @router.get("/my-bookings")
 def get_my_bookings(current_user: dict = Depends(get_current_user)):
     return user_service.get_my_bookings(current_user)
+
+@router.delete("/me", status_code=200)
+def delete_user(current_user: dict = Depends(get_current_user)):
+    return user_service.soft_delete_user(current_user)

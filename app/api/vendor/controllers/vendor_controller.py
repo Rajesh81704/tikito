@@ -185,3 +185,7 @@ async def get_vendor_dashboard(current_user: dict = Depends(get_current_user)):
 async def cancel_booking(booking_id: str, current_user: dict = Depends(get_current_user)):
     return vendor_service.cancel_booking(booking_id, current_user)
 
+@router.delete("/me", status_code=200)
+async def delete_vendor(current_user: dict = Depends(get_current_user)):
+    return vendor_service.soft_delete_vendor(current_user)
+
