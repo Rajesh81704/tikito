@@ -411,3 +411,18 @@ def cancel_booking(booking_id: str, current_user: dict) -> dict:
         raise e
     finally:
         conn.close()
+
+def soft_delete_vendor(current_user: dict) -> dict:
+    conn = get_connection()
+    try:
+        conn.execute(
+            text("UPDATE vendors SET is_active = false WHERE vendor_id = :vendor_id"),
+            {"vendor_id": current_user.get("sub")}
+        )
+        conn.commit()
+        return {"message": "Account deactivated successfully"}
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()

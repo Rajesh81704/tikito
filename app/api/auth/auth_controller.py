@@ -8,9 +8,9 @@ from app.api.core.dependencies import get_current_user
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 class LoginSchema(BaseModel):
-    identifier: str  # phone or email
+    identifier: str  
     password: str
-    role: str  # "user" | "admin" | "vendor"
+    role: str  
 
 class UserMeSchema(BaseModel):
     user_id: UUID

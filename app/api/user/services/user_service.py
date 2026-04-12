@@ -129,20 +129,20 @@ def get_available_slots(turf_ground_id: str) -> list:
 
         print(f"slots found: {len(slots)}, slots: {[dict(s) for s in slots]}")
 
-        # Get already booked slot+date combos in the window
+        # Get already booked slot ids (active bookings)
         booked = conn.execute(
             text("""
-                SELECT slot_id, booking_date FROM bookings
+                SELECT slot_id FROM bookings
                 WHERE slot_id IN (
                     SELECT slot_id FROM turf_slots WHERE turf_ground_id = :id
                 )
-                AND booking_date BETWEEN :start AND :end
                 AND booking_status != 'CANCELLED'
+                AND is_available = false
             """),
-            {"id": turf_ground_id, "start": today, "end": end_date}
+            {"id": turf_ground_id}
         ).fetchall()
 
-        booked_set = {(str(b[0]), str(b[1])) for b in booked}
+        booked_set = {str(b[0]) for b in booked}
 
         # Build available slots per date
         result = []
@@ -152,7 +152,7 @@ def get_available_slots(turf_ground_id: str) -> list:
             for slot in slots:
                 if slot["day_of_week"] == day_name:
                     slot_id = str(slot["slot_id"])
-                    if (slot_id, str(current)) not in booked_set:
+                    if slot_id not in booked_set:
                         result.append({
                             "slot_id": slot_id,
                             "date": str(current),
