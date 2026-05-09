@@ -1,9 +1,10 @@
 from uuid import UUID
 from decimal import Decimal
-from datetime import datetime, time
+from datetime import datetime, time, date
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from app.api.user.services import user_service
+from app.api.user.services import payment_service
 from app.api.vendor.services import vendor_service
 from app.api.core.dependencies import get_current_user
 
@@ -70,9 +71,23 @@ def get_turf_ground_details(turf_id: str, current_user: dict = Depends(get_curre
 def get_available_slots(turf_ground_id: str, current_user: dict = Depends(get_current_user)):
     return user_service.get_available_slots(turf_ground_id)
 
+class VerifyPaymentSchema(BaseModel):
+    booking_id: str
+    razorpay_order_id: str
+    razorpay_payment_id: str
+    razorpay_signature: str
+
 @router.post("/book", status_code=201)
 def book_slot(data: BookSlotSchema, current_user: dict = Depends(get_current_user)):
     return user_service.book_slot(data.model_dump(), current_user)
+
+@router.post("/payment/create-order")
+def create_payment_order(booking_id: str, current_user: dict = Depends(get_current_user)):
+    return payment_service.create_order(booking_id)
+
+@router.post("/payment/verify")
+def verify_payment(data: VerifyPaymentSchema, current_user: dict = Depends(get_current_user)):
+    return payment_service.verify_payment(data.model_dump())
 
 @router.get("/my-bookings")
 def get_my_bookings(current_user: dict = Depends(get_current_user)):

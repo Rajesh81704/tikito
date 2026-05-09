@@ -5,3 +5,5 @@ python-dotenv
 PyJWT
 sqlalchemy
 httpx
+google-auth
+razorpay
