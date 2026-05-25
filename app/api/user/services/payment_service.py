@@ -100,15 +100,17 @@ def verify_payment(data: dict) -> dict:
 
 
 def handle_webhook(payload: bytes, signature: str) -> dict:
-    """Handle Razorpay webhook events (payment.captured, payment.failed)."""
-    # Verify webhook signature
+    """Handle Razorpay webhook events (payment.captured, payment.failed).
+    Uses timing-safe comparison to prevent timing attacks.
+    """
     expected = hmac.new(
         RAZORPAY_WEBHOOK_SECRET.encode(),
         payload,
         hashlib.sha256
     ).hexdigest()
 
-    if expected != signature:
+    # Timing-safe comparison (prevents timing attacks)
+    if not hmac.compare_digest(expected, signature):
         raise Exception("Invalid webhook signature")
 
     import json
