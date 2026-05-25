@@ -7,3 +7,7 @@ sqlalchemy
 httpx
 google-auth
 razorpay
+resend
+boto3
+python-multipart
+redis

@@ -1,7 +1,7 @@
 from uuid import UUID
 from decimal import Decimal
 from datetime import datetime, time, date
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request, HTTPException
 from pydantic import BaseModel
 from app.api.user.services import user_service
 from app.api.user.services import payment_service
@@ -82,12 +82,26 @@ def book_slot(data: BookSlotSchema, current_user: dict = Depends(get_current_use
     return user_service.book_slot(data.model_dump(), current_user)
 
 @router.post("/payment/create-order")
-def create_payment_order(booking_id: str, current_user: dict = Depends(get_current_user)):
-    return payment_service.create_order(booking_id)
+def create_payment_order(booking_id: str, callback_url: str = None, current_user: dict = Depends(get_current_user)):
+    return payment_service.create_order(booking_id, callback_url)
 
 @router.post("/payment/verify")
 def verify_payment(data: VerifyPaymentSchema, current_user: dict = Depends(get_current_user)):
     return payment_service.verify_payment(data.model_dump())
+
+@router.post("/payment/webhook")
+async def razorpay_webhook(request: Request):
+    """Razorpay webhook — no auth required, verified via signature."""
+    signature = request.headers.get("X-Razorpay-Signature", "")
+    payload = await request.body()
+
+    if not signature:
+        raise HTTPException(status_code=400, detail="Missing signature header")
+
+    try:
+        return payment_service.handle_webhook(payload, signature)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/my-bookings")
 def get_my_bookings(current_user: dict = Depends(get_current_user)):

@@ -8,11 +8,14 @@ from app.core.connectdb import get_connection
 
 load_dotenv()
 
-client = razorpay.Client(
-    auth=(os.getenv("RAZORPAY_KEY_ID"), os.getenv("RAZORPAY_KEY_SECRET"))
-)
+RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
+RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
+RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET", RAZORPAY_KEY_SECRET)
 
-def create_order(booking_id: str) -> dict:
+client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
+
+
+def create_order(booking_id: str, callback_url: str = None) -> dict:
     conn = get_connection()
     try:
         booking = conn.execute(
@@ -42,13 +45,18 @@ def create_order(booking_id: str) -> dict:
         )
         conn.commit()
 
-        return {
+        result = {
             "order_id": order["id"],
             "amount": amount_paise,
             "currency": "INR",
             "booking_id": booking_id,
-            "key": os.getenv("RAZORPAY_KEY_ID")
+            "key": RAZORPAY_KEY_ID,
         }
+
+        if callback_url:
+            result["callback_url"] = callback_url
+
+        return result
     finally:
         conn.close()
 
@@ -61,7 +69,7 @@ def verify_payment(data: dict) -> dict:
 
     msg = f"{razorpay_order_id}|{razorpay_payment_id}"
     expected = hmac.new(
-        os.getenv("RAZORPAY_KEY_SECRET").encode(),
+        RAZORPAY_KEY_SECRET.encode(),
         msg.encode(),
         hashlib.sha256
     ).hexdigest()
@@ -89,3 +97,70 @@ def verify_payment(data: dict) -> dict:
         raise e
     finally:
         conn.close()
+
+
+def handle_webhook(payload: bytes, signature: str) -> dict:
+    """Handle Razorpay webhook events (payment.captured, payment.failed)."""
+    # Verify webhook signature
+    expected = hmac.new(
+        RAZORPAY_WEBHOOK_SECRET.encode(),
+        payload,
+        hashlib.sha256
+    ).hexdigest()
+
+    if expected != signature:
+        raise Exception("Invalid webhook signature")
+
+    import json
+    event = json.loads(payload)
+    event_type = event.get("event")
+
+    if event_type == "payment.captured":
+        payment = event["payload"]["payment"]["entity"]
+        order_id = payment.get("order_id")
+        payment_id = payment.get("id")
+
+        conn = get_connection()
+        try:
+            conn.execute(
+                text("""
+                    UPDATE bookings
+                    SET razorpay_payment_id = :payment_id,
+                        payment_status = 'PAID',
+                        booking_status = 'CONFIRMED',
+                        is_available = false
+                    WHERE razorpay_order_id = :order_id
+                """),
+                {"payment_id": payment_id, "order_id": order_id}
+            )
+            conn.commit()
+            return {"status": "ok", "event": event_type}
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+
+    elif event_type == "payment.failed":
+        payment = event["payload"]["payment"]["entity"]
+        order_id = payment.get("order_id")
+
+        conn = get_connection()
+        try:
+            conn.execute(
+                text("""
+                    UPDATE bookings
+                    SET payment_status = 'FAILED'
+                    WHERE razorpay_order_id = :order_id
+                """),
+                {"order_id": order_id}
+            )
+            conn.commit()
+            return {"status": "ok", "event": event_type}
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+
+    return {"status": "ignored", "event": event_type}

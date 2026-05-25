@@ -1,5 +1,6 @@
 from sqlalchemy import text
 from app.core.connectdb import get_connection
+from app.core.cache import cache_get, cache_set, cache_delete_pattern
 def get_all():
     pass
 
@@ -39,6 +40,10 @@ def add_turf(data: dict, current_user: dict) -> dict:
         })
         conn.commit()
         turf_field_id = result.fetchone()[0]
+
+        # Invalidate turfs cache
+        cache_delete_pattern("turfs:city:*")
+
         return {"turf_field_id": str(turf_field_id)}
     
     except Exception as e:
@@ -154,6 +159,10 @@ def edit_ground(turf_ground_id: str, data: dict, current_user: dict) -> dict:
                     )
 
         conn.commit()
+
+        # Invalidate grounds cache
+        cache_delete_pattern(f"grounds:turf:*")
+
         return {"turf_ground_id": turf_ground_id, "message": "Ground updated successfully"}
     except Exception as e:
         conn.rollback()
@@ -175,6 +184,12 @@ def get_turfs_by_vendor(current_user: dict) -> list:
         conn.close()
 
 def get_grounds_by_turf(turf_field_id: str) -> list:
+    """Get grounds with slots — cached for 5 minutes."""
+    cache_key = f"grounds:turf:{turf_field_id}"
+    cached_result = cache_get(cache_key)
+    if cached_result is not None:
+        return cached_result
+
     conn = get_connection()
     try:
         result = conn.execute(
@@ -201,7 +216,9 @@ def get_grounds_by_turf(turf_field_id: str) -> list:
             {"turf_field_id": turf_field_id}
         )
         rows = result.mappings().all()
-        return [_serialize(dict(row)) for row in rows]
+        data = [_serialize(dict(row)) for row in rows]
+        cache_set(cache_key, data, ttl=300)
+        return data
     finally:
         conn.close()
 
@@ -316,6 +333,8 @@ def update_ground_schedule(turf_ground_id: str, schedule: list) -> dict:
                 slot_count += 1
 
         conn.commit()
+        cache_delete_pattern(f"grounds:turf:*")
+        cache_delete_pattern(f"slots:available:{turf_ground_id}")
         return {"turf_ground_id": turf_ground_id, "slots_updated": slot_count}
     except Exception as e:
         conn.rollback()
@@ -421,6 +440,81 @@ def soft_delete_vendor(current_user: dict) -> dict:
         )
         conn.commit()
         return {"message": "Account deactivated successfully"}
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
+
+# ─── Image Management ─────────────────────────────────────────────────────────
+
+import json
+
+def add_turf_images(turf_field_id: str, new_urls: list[str], current_user: dict) -> None:
+    """Append image URLs to a turf's turf_images column (JSON array stored as text)."""
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            text("SELECT turf_images FROM turf_fields WHERE turf_field_id = :id AND vendor_id = :vendor_id"),
+            {"id": turf_field_id, "vendor_id": current_user.get("sub")}
+        ).fetchone()
+
+        if not row:
+            raise Exception("Turf not found or unauthorized")
+
+        existing = []
+        if row.turf_images:
+            try:
+                existing = json.loads(row.turf_images)
+            except (json.JSONDecodeError, TypeError):
+                existing = [row.turf_images] if row.turf_images else []
+
+        existing.extend(new_urls)
+
+        conn.execute(
+            text("UPDATE turf_fields SET turf_images = :images, updated_at = CURRENT_TIMESTAMP WHERE turf_field_id = :id"),
+            {"images": json.dumps(existing), "id": turf_field_id}
+        )
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
+
+def add_ground_images(turf_ground_id: str, new_urls: list[str], current_user: dict) -> None:
+    """Append image URLs to a ground's ground_images column (JSON array stored as text)."""
+    conn = get_connection()
+    try:
+        # Verify the ground belongs to the vendor
+        row = conn.execute(
+            text("""
+                SELECT g.ground_images FROM turf_grounds g
+                JOIN turf_fields tf ON tf.turf_field_id = g.turf_field_id
+                WHERE g.turf_ground_id = :id AND tf.vendor_id = :vendor_id
+            """),
+            {"id": turf_ground_id, "vendor_id": current_user.get("sub")}
+        ).fetchone()
+
+        if not row:
+            raise Exception("Ground not found or unauthorized")
+
+        existing = []
+        if row.ground_images:
+            try:
+                existing = json.loads(row.ground_images)
+            except (json.JSONDecodeError, TypeError):
+                existing = [row.ground_images] if row.ground_images else []
+
+        existing.extend(new_urls)
+
+        conn.execute(
+            text("UPDATE turf_grounds SET ground_images = :images, updated_at = CURRENT_TIMESTAMP WHERE turf_ground_id = :id"),
+            {"images": json.dumps(existing), "id": turf_ground_id}
+        )
+        conn.commit()
     except Exception as e:
         conn.rollback()
         raise e

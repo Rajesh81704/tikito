@@ -2,10 +2,11 @@ from uuid import UUID
 from decimal import Decimal
 from datetime import datetime, time, date
 from enum import Enum
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 from pydantic import BaseModel
 from app.api.vendor.services import vendor_service, vendor_auth_service
 from app.api.core.dependencies import get_current_user
+from app.api.core.r2_storage import upload_file
 
 router = APIRouter(prefix="/vendors", tags=["vendors"])
 
@@ -130,16 +131,87 @@ async def signup(data: VendorSignupSchema):
     return vendor_auth_service.signup(data.model_dump())
 
 @router.post("/add-turf", status_code=201)
-async def add_turf(data: AddTurfSchema, current_user: dict = Depends(get_current_user)):
-    return vendor_service.add_turf(data.model_dump(), current_user)
+async def add_turf(
+    turf_name: str = Form(...),
+    turf_location: str = Form(None),
+    turf_address: str = Form(None),
+    no_of_grounds: int = Form(None),
+    turf_facilities: str = Form(None),
+    turf_rules: str = Form(None),
+    is_active: bool = Form(True),
+    latitude: float = Form(None),
+    longitude: float = Form(None),
+    images: list[UploadFile] = File(None),
+    current_user: dict = Depends(get_current_user),
+):
+    data = {
+        "turf_name": turf_name,
+        "turf_location": turf_location,
+        "turf_address": turf_address,
+        "no_of_grounds": no_of_grounds,
+        "turf_facilities": turf_facilities,
+        "turf_rules": turf_rules,
+        "is_active": is_active,
+        "latitude": latitude,
+        "longitude": longitude,
+    }
+    result = vendor_service.add_turf(data, current_user)
+
+    # Upload images if provided
+    if images and images[0].filename:
+        turf_field_id = result["turf_field_id"]
+        urls = []
+        for file in images:
+            if file.content_type not in ALLOWED_TYPES:
+                raise HTTPException(status_code=400, detail=f"Invalid file type: {file.filename}")
+            content = await file.read()
+            if len(content) > MAX_FILE_SIZE:
+                raise HTTPException(status_code=400, detail=f"File too large: {file.filename}. Max 5MB")
+            url = upload_file(content, file.filename, f"turfs/{turf_field_id}", file.content_type)
+            urls.append(url)
+        vendor_service.add_turf_images(turf_field_id, urls, current_user)
+        result["images"] = urls
+
+    return result
 
 @router.put("/edit-turf/{turf_field_id}")
 async def edit_turf(turf_field_id: str,  data: EditTurfSchema, current_user: dict = Depends(get_current_user)):
     return vendor_service.edit_turf(turf_field_id, data.model_dump(exclude_none=True), current_user)
 
 @router.post("/turf/{turf_field_id}/add-ground", status_code=201)
-async def add_ground(turf_field_id: str, data: AddGroundSchema, current_user: dict = Depends(get_current_user)):
-    return vendor_service.add_ground(turf_field_id, data.model_dump(), current_user)
+async def add_ground(
+    turf_field_id: str,
+    ground_name: str = Form(...),
+    ground_loc: str = Form(None),
+    ground_type: str = Form(None),
+    booking_weeks: int = Form(1),
+    images: list[UploadFile] = File(None),
+    current_user: dict = Depends(get_current_user),
+):
+    data = {
+        "ground_name": ground_name,
+        "ground_loc": ground_loc,
+        "ground_type": ground_type,
+        "booking_weeks": booking_weeks,
+    }
+    result = vendor_service.add_ground(turf_field_id, data, current_user)
+
+    # Upload images if provided
+    if images and images[0].filename:
+        turf_ground_id = result["turf_ground_id"]
+        urls = []
+        for file in images:
+            if file.content_type not in ALLOWED_TYPES:
+                raise HTTPException(status_code=400, detail=f"Invalid file type: {file.filename}")
+            content = await file.read()
+            if len(content) > MAX_FILE_SIZE:
+                raise HTTPException(status_code=400, detail=f"File too large: {file.filename}. Max 5MB")
+            url = upload_file(content, file.filename, f"grounds/{turf_ground_id}", file.content_type)
+            urls.append(url)
+        vendor_service.add_ground_images(turf_ground_id, urls, current_user)
+        result["images"] = urls
+
+    return result
 
 @router.put("/edit-ground/{turf_ground_id}")
 async def edit_ground(turf_ground_id: str, data: EditGroundSchema, current_user: dict = Depends(get_current_user)):
@@ -162,7 +234,7 @@ async def get_grounds_by_turf(turf_field_id: str, current_user: dict = Depends(g
     return vendor_service.get_grounds_by_turf(turf_field_id)
 
 @router.get("/turf/{turf_field_id}/location")
-async def get_turf_location(turf_field_id: str):
+async def get_turf_location(turf_field_id: str, current_user: dict = Depends(get_current_user)):
     return vendor_service.get_turf_location(turf_field_id)
 
 @router.get("/bookings", response_model=list[BookingResponseSchema])
@@ -188,4 +260,60 @@ async def cancel_booking(booking_id: str, current_user: dict = Depends(get_curre
 @router.delete("/me", status_code=200)
 async def delete_vendor(current_user: dict = Depends(get_current_user)):
     return vendor_service.soft_delete_vendor(current_user)
+
+
+# ─── Image Upload Routes ──────────────────────────────────────────────────────
+
+ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp", "image/jpg"}
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
+
+
+@router.post("/turf/{turf_field_id}/upload-images", status_code=201)
+async def upload_turf_images(
+    turf_field_id: str,
+    files: list[UploadFile] = File(...),
+    current_user: dict = Depends(get_current_user),
+):
+    """Upload images for a turf. Appends to existing images."""
+    if len(files) > 5:
+        raise HTTPException(status_code=400, detail="Maximum 5 images per upload")
+
+    urls = []
+    for file in files:
+        if file.content_type not in ALLOWED_TYPES:
+            raise HTTPException(status_code=400, detail=f"Invalid file type: {file.filename}. Allowed: jpeg, png, webp")
+        content = await file.read()
+        if len(content) > MAX_FILE_SIZE:
+            raise HTTPException(status_code=400, detail=f"File too large: {file.filename}. Max 5MB")
+        url = upload_file(content, file.filename, f"turfs/{turf_field_id}", file.content_type)
+        urls.append(url)
+
+    # Save URLs to DB (append to existing)
+    vendor_service.add_turf_images(turf_field_id, urls, current_user)
+    return {"message": f"{len(urls)} image(s) uploaded", "urls": urls}
+
+
+@router.post("/ground/{turf_ground_id}/upload-images", status_code=201)
+async def upload_ground_images(
+    turf_ground_id: str,
+    files: list[UploadFile] = File(...),
+    current_user: dict = Depends(get_current_user),
+):
+    """Upload images for a ground. Appends to existing images."""
+    if len(files) > 5:
+        raise HTTPException(status_code=400, detail="Maximum 5 images per upload")
+
+    urls = []
+    for file in files:
+        if file.content_type not in ALLOWED_TYPES:
+            raise HTTPException(status_code=400, detail=f"Invalid file type: {file.filename}. Allowed: jpeg, png, webp")
+        content = await file.read()
+        if len(content) > MAX_FILE_SIZE:
+            raise HTTPException(status_code=400, detail=f"File too large: {file.filename}. Max 5MB")
+        url = upload_file(content, file.filename, f"grounds/{turf_ground_id}", file.content_type)
+        urls.append(url)
+
+    # Save URLs to DB (append to existing)
+    vendor_service.add_ground_images(turf_ground_id, urls, current_user)
+    return {"message": f"{len(urls)} image(s) uploaded", "urls": urls}
 

@@ -1,5 +1,6 @@
 from sqlalchemy import text
 from app.core.connectdb import get_connection
+from app.core.cache import cached, cache_delete_pattern
 
 def create(data: dict) -> dict:
     conn = get_connection()
@@ -78,6 +79,14 @@ def get_nearby_turfs(lat: float, lng: float, radius_km: float) -> list:
         conn.close()
 
 def get_turfs_by_city(city: str) -> list:
+    """Get turfs by city with 10-minute cache."""
+    from app.core.cache import cache_get, cache_set
+
+    cache_key = f"turfs:city:{city.lower().strip()}"
+    cached_result = cache_get(cache_key)
+    if cached_result is not None:
+        return cached_result
+
     conn = get_connection()
     try:
         rows = conn.execute(
@@ -90,15 +99,24 @@ def get_turfs_by_city(city: str) -> list:
             """),
             {"city": f"%{city}%"}
         ).mappings().all()
-        return [
+        result = [
             {k: str(v) if hasattr(v, 'hex') else v for k, v in dict(row).items()}
             for row in rows
         ]
+        cache_set(cache_key, result, ttl=600)
+        return result
     finally:
         conn.close()
 
 def get_available_slots(turf_ground_id: str) -> list:
+    """Get available slots with 2-minute cache."""
     from datetime import date, timedelta
+    from app.core.cache import cache_get, cache_set
+
+    cache_key = f"slots:available:{turf_ground_id}"
+    cached_result = cache_get(cache_key)
+    if cached_result is not None:
+        return cached_result
 
     DAYS = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"]
 
@@ -164,6 +182,7 @@ def get_available_slots(turf_ground_id: str) -> list:
                         })
             current += timedelta(days=1)
 
+        cache_set(cache_key, result, ttl=120)
         return result
     finally:
         conn.close()
@@ -177,7 +196,7 @@ def book_slot(data: dict, current_user: dict) -> dict:
         user_id = current_user.get("sub")
 
         slot = conn.execute(
-            text("SELECT slot_id FROM turf_slots WHERE slot_id = :slot_id"),
+            text("SELECT slot_id, turf_ground_id FROM turf_slots WHERE slot_id = :slot_id"),
             {"slot_id": slot_id}
         ).fetchone()
         if not slot:
@@ -193,6 +212,10 @@ def book_slot(data: dict, current_user: dict) -> dict:
         )
         booking_id = result.fetchone()[0]
         conn.commit()
+
+        # Invalidate slots cache for this ground
+        cache_delete_pattern(f"slots:available:{slot.turf_ground_id}")
+
         return {"booking_id": str(booking_id), "message": "Slot booked successfully"}
 
     except Exception as e:
