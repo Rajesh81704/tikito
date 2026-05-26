@@ -144,6 +144,18 @@
             return new URLSearchParams(window.location.search).get(name);
         }
 
+        function redirectToApp(path) {
+            // Try custom scheme redirect
+            window.location.replace(path);
+            
+            // Fallback: show success message if redirect doesn't work
+            setTimeout(() => {
+                document.querySelector(".spinner").style.display = "none";
+                document.querySelector(".title").textContent = "Payment Successful ✓";
+                document.querySelector(".subtitle").textContent = "You can close this window and return to the app.";
+            }, 1500);
+        }
+
         function startPayment() {
             const key = getParam("key");
             const amount = getParam("amount");
@@ -165,15 +177,16 @@
                 description: "Turf Booking Payment",
                 order_id: orderId,
                 handler: (response) => {
-                    window.location.href =
-                        `tikito-player:///payment-success?orderId=${response.razorpay_order_id}` +
+                    const redirectUrl =
+                        `exp+tikito-player:///payment-success?orderId=${response.razorpay_order_id}` +
                         `&paymentId=${response.razorpay_payment_id}` +
                         `&signature=${response.razorpay_signature}` +
                         `&bookingId=${bookingId || ''}`;
+                    redirectToApp(redirectUrl);
                 },
                 modal: {
                     ondismiss: () => {
-                        window.location.href = "tikito-player:///payment-failed";
+                        redirectToApp("exp+tikito-player:///payment-failed");
                     }
                 },
                 theme: { color: "#4F46E5" }
