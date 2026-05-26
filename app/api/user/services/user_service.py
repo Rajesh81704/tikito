@@ -147,15 +147,14 @@ def get_available_slots(turf_ground_id: str) -> list:
 
         print(f"slots found: {len(slots)}, slots: {[dict(s) for s in slots]}")
 
-        # Get already booked slot ids (active bookings)
+        # Get already booked slot ids (active bookings - both PENDING and CONFIRMED)
         booked = conn.execute(
             text("""
                 SELECT slot_id FROM bookings
                 WHERE slot_id IN (
                     SELECT slot_id FROM turf_slots WHERE turf_ground_id = :id
                 )
-                AND booking_status != 'CANCELLED'
-                AND is_available = false
+                AND booking_status IN ('PENDING', 'CONFIRMED')
             """),
             {"id": turf_ground_id}
         ).fetchall()
@@ -204,8 +203,8 @@ def book_slot(data: dict, current_user: dict) -> dict:
 
         result = conn.execute(
             text("""
-                INSERT INTO bookings (slot_id, user_id, booking_date, booking_status, is_available)
-                VALUES (:slot_id, :user_id, :booking_date, 'CONFIRMED', false)
+                INSERT INTO bookings (slot_id, user_id, booking_date, booking_status, is_available, payment_status)
+                VALUES (:slot_id, :user_id, :booking_date, 'PENDING', true, 'PENDING')
                 RETURNING booking_id
             """),
             {"slot_id": slot_id, "user_id": user_id, "booking_date": date.today()}
@@ -229,7 +228,8 @@ def get_my_bookings(current_user: dict) -> list:
     try:
         rows = conn.execute(
             text("""
-                SELECT b.booking_id, b.booking_date, b.booking_status, b.is_available, b.booked_at,
+                SELECT b.booking_id, b.booking_date, b.booking_status, b.payment_status,
+                       b.is_available, b.booked_at,
                        s.start_time, s.end_time, s.price, s.day_of_week,
                        g.ground_name, g.ground_type,
                        tf.turf_name, tf.turf_address
@@ -238,8 +238,8 @@ def get_my_bookings(current_user: dict) -> list:
                 JOIN turf_grounds g ON g.turf_ground_id = s.turf_ground_id
                 JOIN turf_fields tf ON tf.turf_field_id = g.turf_field_id
                 WHERE b.user_id = :user_id
-                AND b.is_available = false
-                ORDER BY b.booking_date DESC
+                AND b.booking_status != 'CANCELLED'
+                ORDER BY b.booked_at DESC
             """),
             {"user_id": current_user.get("sub")}
         ).mappings().all()
