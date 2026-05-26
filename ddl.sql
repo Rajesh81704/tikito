@@ -157,3 +157,8 @@ CREATE TABLE public.bookings (
 	CONSTRAINT bookings_slot_id_fkey FOREIGN KEY (slot_id) REFERENCES public.turf_slots(slot_id) ON DELETE CASCADE
 );
 CREATE INDEX idx_bookings_slot ON public.bookings USING btree (slot_id);
+
+
+ALTER TABLE bookings ALTER COLUMN booking_status SET DEFAULT 'PENDING';
+ALTER TABLE bookings ALTER COLUMN payment_status SET DEFAULT 'PENDING';
+ALTER TABLE bookings ALTER COLUMN is_available SET DEFAULT true;

@@ -67,6 +67,11 @@ def verify_payment(data: dict) -> dict:
     razorpay_payment_id = data.get("razorpay_payment_id")
     razorpay_signature = data.get("razorpay_signature")
 
+    print(f"[PAYMENT VERIFY] booking_id={booking_id}")
+    print(f"[PAYMENT VERIFY] order_id={razorpay_order_id}")
+    print(f"[PAYMENT VERIFY] payment_id={razorpay_payment_id}")
+    print(f"[PAYMENT VERIFY] signature={razorpay_signature}")
+
     msg = f"{razorpay_order_id}|{razorpay_payment_id}"
     expected = hmac.new(
         RAZORPAY_KEY_SECRET.encode(),
@@ -74,9 +79,14 @@ def verify_payment(data: dict) -> dict:
         hashlib.sha256
     ).hexdigest()
 
+    print(f"[PAYMENT VERIFY] expected_sig={expected}")
+    print(f"[PAYMENT VERIFY] sig_match={expected == razorpay_signature}")
+
     if expected != razorpay_signature:
+        print(f"[PAYMENT VERIFY] SIGNATURE MISMATCH - REJECTING")
         raise Exception("Invalid payment signature")
 
+    print(f"[PAYMENT VERIFY] SIGNATURE VALID - CONFIRMING BOOKING")
     conn = get_connection()
     try:
         conn.execute(
@@ -91,6 +101,7 @@ def verify_payment(data: dict) -> dict:
             {"payment_id": razorpay_payment_id, "booking_id": booking_id}
         )
         conn.commit()
+        print(f"[PAYMENT VERIFY] BOOKING {booking_id} CONFIRMED")
         return {"message": "Payment verified and booking confirmed", "booking_id": booking_id}
     except Exception as e:
         conn.rollback()
