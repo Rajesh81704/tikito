@@ -1,7 +1,6 @@
 """Cloudflare R2 storage service (S3-compatible)."""
 import os
 import uuid
-import boto3
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -12,17 +11,25 @@ R2_SECRET_ACCESS_KEY = os.getenv("R2_SECRET_ACCESS_KEY")
 R2_BUCKET_NAME = os.getenv("R2_BUCKET_NAME")
 R2_PUBLIC_URL = os.getenv("R2_PUBLIC_URL")
 
-s3_client = boto3.client(
-    "s3",
-    endpoint_url=R2_ENDPOINT_URL,
-    aws_access_key_id=R2_ACCESS_KEY_ID,
-    aws_secret_access_key=R2_SECRET_ACCESS_KEY,
-    region_name="auto",
-)
+s3_client = None
+try:
+    import boto3
+    if R2_ENDPOINT_URL and R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY:
+        s3_client = boto3.client(
+            "s3",
+            endpoint_url=R2_ENDPOINT_URL,
+            aws_access_key_id=R2_ACCESS_KEY_ID,
+            aws_secret_access_key=R2_SECRET_ACCESS_KEY,
+            region_name="auto",
+        )
+except Exception:
+    pass
 
 
 def upload_file(file_bytes: bytes, filename: str, folder: str, content_type: str = "image/jpeg") -> str:
     """Upload a file to R2 and return the public URL."""
+    if not s3_client:
+        raise Exception("R2 storage not configured")
     ext = filename.rsplit(".", 1)[-1] if "." in filename else "jpg"
     key = f"{folder}/{uuid.uuid4().hex}.{ext}"
 
@@ -38,7 +45,7 @@ def upload_file(file_bytes: bytes, filename: str, folder: str, content_type: str
 
 def delete_file(file_url: str) -> bool:
     """Delete a file from R2 by its public URL."""
-    if not file_url or not R2_PUBLIC_URL:
+    if not file_url or not R2_PUBLIC_URL or not s3_client:
         return False
     key = file_url.replace(f"{R2_PUBLIC_URL}/", "")
     try:

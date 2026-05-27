@@ -1,7 +1,6 @@
 """Forgot password flow using Resend for OTP emails."""
 import os
 import random
-import resend
 from dotenv import load_dotenv
 from sqlalchemy import text
 from app.core.connectdb import get_connection
@@ -9,7 +8,12 @@ from app.core.cache import redis_client
 
 load_dotenv()
 
-resend.api_key = os.getenv("RESEND_API_KEY")
+try:
+    import resend
+    resend.api_key = os.getenv("RESEND_API_KEY")
+except ImportError:
+    resend = None
+
 FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev")
 
 OTP_EXPIRY_SECONDS = 300  # 5 minutes
