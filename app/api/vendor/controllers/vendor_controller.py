@@ -200,49 +200,37 @@ MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
 @router.post("/turf/{turf_field_id}/upload-images", status_code=201)
 async def upload_turf_images(
     turf_field_id: str,
-    files: list[UploadFile] = File(...),
+    file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user),
 ):
-    """Upload images for a turf. Appends to existing images."""
-    if len(files) > 5:
-        raise HTTPException(status_code=400, detail="Maximum 5 images per upload")
+    """Upload a single image for a turf. Appends to existing images."""
+    if file.content_type not in ALLOWED_TYPES:
+        raise HTTPException(status_code=400, detail=f"Invalid file type: {file.filename}. Allowed: jpeg, png, webp")
+    content = await file.read()
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=400, detail=f"File too large: {file.filename}. Max 5MB")
+    url = upload_file(content, file.filename, f"turfs/{turf_field_id}", file.content_type)
 
-    urls = []
-    for file in files:
-        if file.content_type not in ALLOWED_TYPES:
-            raise HTTPException(status_code=400, detail=f"Invalid file type: {file.filename}. Allowed: jpeg, png, webp")
-        content = await file.read()
-        if len(content) > MAX_FILE_SIZE:
-            raise HTTPException(status_code=400, detail=f"File too large: {file.filename}. Max 5MB")
-        url = upload_file(content, file.filename, f"turfs/{turf_field_id}", file.content_type)
-        urls.append(url)
-
-    # Save URLs to DB (append to existing)
-    vendor_service.add_turf_images(turf_field_id, urls, current_user)
-    return {"message": f"{len(urls)} image(s) uploaded", "urls": urls}
+    # Save URL to DB (append to existing)
+    vendor_service.add_turf_images(turf_field_id, [url], current_user)
+    return {"message": "Image uploaded", "url": url}
 
 
 @router.post("/ground/{turf_ground_id}/upload-images", status_code=201)
 async def upload_ground_images(
     turf_ground_id: str,
-    files: list[UploadFile] = File(...),
+    file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user),
 ):
-    """Upload images for a ground. Appends to existing images."""
-    if len(files) > 5:
-        raise HTTPException(status_code=400, detail="Maximum 5 images per upload")
+    """Upload a single image for a ground. Appends to existing images."""
+    if file.content_type not in ALLOWED_TYPES:
+        raise HTTPException(status_code=400, detail=f"Invalid file type: {file.filename}. Allowed: jpeg, png, webp")
+    content = await file.read()
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=400, detail=f"File too large: {file.filename}. Max 5MB")
+    url = upload_file(content, file.filename, f"grounds/{turf_ground_id}", file.content_type)
 
-    urls = []
-    for file in files:
-        if file.content_type not in ALLOWED_TYPES:
-            raise HTTPException(status_code=400, detail=f"Invalid file type: {file.filename}. Allowed: jpeg, png, webp")
-        content = await file.read()
-        if len(content) > MAX_FILE_SIZE:
-            raise HTTPException(status_code=400, detail=f"File too large: {file.filename}. Max 5MB")
-        url = upload_file(content, file.filename, f"grounds/{turf_ground_id}", file.content_type)
-        urls.append(url)
-
-    # Save URLs to DB (append to existing)
-    vendor_service.add_ground_images(turf_ground_id, urls, current_user)
-    return {"message": f"{len(urls)} image(s) uploaded", "urls": urls}
+    # Save URL to DB (append to existing)
+    vendor_service.add_ground_images(turf_ground_id, [url], current_user)
+    return {"message": "Image uploaded", "url": url}
 
