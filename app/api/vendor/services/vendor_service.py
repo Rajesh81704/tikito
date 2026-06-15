@@ -1,6 +1,5 @@
 from sqlalchemy import text
 from app.core.connectdb import get_connection
-from app.core.cache import cache_get, cache_set, cache_delete_pattern
 def get_all():
     pass
 
@@ -41,9 +40,6 @@ def add_turf(data: dict, current_user: dict) -> dict:
         conn.commit()
         turf_field_id = result.fetchone()[0]
 
-        # Invalidate turfs cache
-        cache_delete_pattern("turfs:city:*")
-
         return {"turf_field_id": str(turf_field_id)}
     
     except Exception as e:
@@ -76,6 +72,7 @@ def add_ground(turf_field_id: str, data: dict, current_user: dict) -> dict:
         )
         turf_ground_id = result.fetchone()[0]
         conn.commit()
+
         return {"turf_ground_id": str(turf_ground_id)}
 
     except Exception as e:
@@ -160,9 +157,6 @@ def edit_ground(turf_ground_id: str, data: dict, current_user: dict) -> dict:
 
         conn.commit()
 
-        # Invalidate grounds cache
-        cache_delete_pattern(f"grounds:turf:*")
-
         return {"turf_ground_id": turf_ground_id, "message": "Ground updated successfully"}
     except Exception as e:
         conn.rollback()
@@ -196,12 +190,8 @@ def get_turfs_by_vendor(current_user: dict) -> list:
         conn.close()
 
 def get_grounds_by_turf(turf_field_id: str) -> list:
-    """Get grounds with slots — cached for 5 minutes."""
+    """Get grounds with slots."""
     import json as _json
-    cache_key = f"grounds:turf:{turf_field_id}"
-    cached_result = cache_get(cache_key)
-    if cached_result is not None:
-        return cached_result
 
     conn = get_connection()
     try:
@@ -241,7 +231,6 @@ def get_grounds_by_turf(turf_field_id: str) -> list:
             else:
                 item["ground_images"] = []
             data.append(item)
-        cache_set(cache_key, data, ttl=300)
         return data
     finally:
         conn.close()
@@ -357,8 +346,6 @@ def update_ground_schedule(turf_ground_id: str, schedule: list) -> dict:
                 slot_count += 1
 
         conn.commit()
-        cache_delete_pattern(f"grounds:turf:*")
-        cache_delete_pattern(f"slots:available:{turf_ground_id}")
         return {"turf_ground_id": turf_ground_id, "slots_updated": slot_count}
     except Exception as e:
         conn.rollback()
