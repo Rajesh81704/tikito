@@ -442,6 +442,36 @@ def cancel_booking(booking_id: str, current_user: dict) -> dict:
     finally:
         conn.close()
 
+def delete_slot(slot_id: str, current_user: dict) -> dict:
+    """Delete a specific slot, ensuring it belongs to the vendor's turf."""
+    conn = get_connection()
+    try:
+        # Verify the slot belongs to the vendor
+        row = conn.execute(
+            text("""
+                SELECT s.slot_id FROM turf_slots s
+                JOIN turf_grounds g ON g.turf_ground_id = s.turf_ground_id
+                JOIN turf_fields tf ON tf.turf_field_id = g.turf_field_id
+                WHERE s.slot_id = :slot_id AND tf.vendor_id = :vendor_id
+            """),
+            {"slot_id": slot_id, "vendor_id": current_user.get("sub")}
+        ).fetchone()
+
+        if not row:
+            raise Exception("Slot not found or unauthorized")
+
+        conn.execute(
+            text("DELETE FROM turf_slots WHERE slot_id = :slot_id"),
+            {"slot_id": slot_id}
+        )
+        conn.commit()
+        return {"slot_id": slot_id, "message": "Slot deleted successfully"}
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
 def soft_delete_vendor(current_user: dict) -> dict:
     conn = get_connection()
     try:
