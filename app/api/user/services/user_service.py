@@ -46,7 +46,7 @@ def get_nearby_turfs(lat: float, lng: float, radius_km: float) -> list:
     conn = get_connection()
     try:
         rows = conn.execute(
-            text("SELECT turf_field_id, turf_name, turf_address, turf_location FROM turf_fields WHERE is_active = true")
+            text("SELECT turf_field_id, turf_name, turf_address, turf_location, turf_images FROM turf_fields WHERE is_active = true")
         ).mappings().all()
 
         nearby = []
@@ -64,11 +64,20 @@ def get_nearby_turfs(lat: float, lng: float, radius_km: float) -> list:
             turf_lng = float(res[0]["lon"])
             distance = haversine(lat, lng, turf_lat, turf_lng)
             if distance <= radius_km:
+                import json
+                images = []
+                if row["turf_images"]:
+                    try:
+                        images = json.loads(row["turf_images"])
+                    except (json.JSONDecodeError, TypeError):
+                        images = [row["turf_images"]] if row["turf_images"] else []
+
                 nearby.append({
                     "turf_field_id": str(row["turf_field_id"]),
                     "turf_name": row["turf_name"],
                     "turf_address": row["turf_address"],
                     "turf_location": row["turf_location"],
+                    "turf_images": images,
                     "latitude": turf_lat,
                     "longitude": turf_lng,
                     "distance_km": round(distance, 2)
@@ -81,6 +90,7 @@ def get_nearby_turfs(lat: float, lng: float, radius_km: float) -> list:
 def get_turfs_by_city(city: str) -> list:
     """Get turfs by city with 10-minute cache."""
     from app.core.cache import cache_get, cache_set
+    import json
 
     cache_key = f"turfs:city:{city.lower().strip()}"
     cached_result = cache_get(cache_key)
@@ -92,17 +102,26 @@ def get_turfs_by_city(city: str) -> list:
         rows = conn.execute(
             text("""
                 SELECT turf_field_id, turf_name, turf_location, turf_address,
-                       no_of_grounds, turf_facilities, turf_rules
+                       no_of_grounds, turf_facilities, turf_rules, turf_images,
+                       latitude, longitude
                 FROM turf_fields
                 WHERE is_active = true
                 AND turf_location ILIKE :city
             """),
             {"city": f"%{city}%"}
         ).mappings().all()
-        result = [
-            {k: str(v) if hasattr(v, 'hex') else v for k, v in dict(row).items()}
-            for row in rows
-        ]
+        result = []
+        for row in rows:
+            item = {k: str(v) if hasattr(v, 'hex') else v for k, v in dict(row).items()}
+            # Parse turf_images from JSON string to array
+            if item.get("turf_images"):
+                try:
+                    item["turf_images"] = json.loads(item["turf_images"])
+                except (json.JSONDecodeError, TypeError):
+                    item["turf_images"] = [item["turf_images"]] if item["turf_images"] else []
+            else:
+                item["turf_images"] = []
+            result.append(item)
         cache_set(cache_key, result, ttl=600)
         return result
     finally:

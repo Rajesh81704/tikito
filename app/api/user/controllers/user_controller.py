@@ -24,6 +24,7 @@ class TurfResponseSchema(BaseModel):
     no_of_grounds: int | None = None
     turf_facilities: str | None = None
     turf_rules: str | None = None
+    turf_images: list[str] | None = None
     longitude: str | None = None
     latitude: str | None = None
 

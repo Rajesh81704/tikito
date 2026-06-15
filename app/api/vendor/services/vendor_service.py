@@ -172,6 +172,7 @@ def _serialize(row: dict) -> dict:
     return {k: str(v) if hasattr(v, 'hex') else v for k, v in row.items()}
 
 def get_turfs_by_vendor(current_user: dict) -> list:
+    import json as _json
     conn = get_connection()
     try:
         result = conn.execute(
@@ -179,12 +180,24 @@ def get_turfs_by_vendor(current_user: dict) -> list:
             {"vendor_id": current_user.get("sub")}
         )
         rows = result.mappings().all()
-        return [_serialize(dict(row)) for row in rows]
+        data = []
+        for row in rows:
+            item = _serialize(dict(row))
+            if item.get("turf_images"):
+                try:
+                    item["turf_images"] = _json.loads(item["turf_images"])
+                except (_json.JSONDecodeError, TypeError):
+                    item["turf_images"] = [item["turf_images"]] if item["turf_images"] else []
+            else:
+                item["turf_images"] = []
+            data.append(item)
+        return data
     finally:
         conn.close()
 
 def get_grounds_by_turf(turf_field_id: str) -> list:
     """Get grounds with slots — cached for 5 minutes."""
+    import json as _json
     cache_key = f"grounds:turf:{turf_field_id}"
     cached_result = cache_get(cache_key)
     if cached_result is not None:
@@ -216,7 +229,18 @@ def get_grounds_by_turf(turf_field_id: str) -> list:
             {"turf_field_id": turf_field_id}
         )
         rows = result.mappings().all()
-        data = [_serialize(dict(row)) for row in rows]
+        data = []
+        for row in rows:
+            item = _serialize(dict(row))
+            # Parse ground_images from JSON string to array
+            if item.get("ground_images"):
+                try:
+                    item["ground_images"] = _json.loads(item["ground_images"])
+                except (_json.JSONDecodeError, TypeError):
+                    item["ground_images"] = [item["ground_images"]] if item["ground_images"] else []
+            else:
+                item["ground_images"] = []
+            data.append(item)
         cache_set(cache_key, data, ttl=300)
         return data
     finally:
