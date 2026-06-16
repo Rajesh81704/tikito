@@ -179,16 +179,14 @@
                 description: "Turf Booking Payment",
                 order_id: orderId,
                 handler: (response) => {
-                    // Call verify endpoint synchronously to ensure it completes
-                    const xhr = new XMLHttpRequest();
-                    xhr.open("POST", "/users/payment/verify", false); // synchronous
-                    xhr.setRequestHeader("Content-Type", "application/json");
-                    xhr.send(JSON.stringify({
+                    // Use sendBeacon for reliable delivery even if page closes
+                    const payload = JSON.stringify({
                         booking_id: bookingId,
                         razorpay_order_id: response.razorpay_order_id,
                         razorpay_payment_id: response.razorpay_payment_id,
                         razorpay_signature: response.razorpay_signature,
-                    }));
+                    });
+                    navigator.sendBeacon("/users/payment/verify", new Blob([payload], { type: "application/json" }));
 
                     // Redirect back to app
                     const appUrl = callbackUrl
