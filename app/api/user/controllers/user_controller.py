@@ -87,7 +87,7 @@ def create_payment_order(booking_id: str, callback_url: str = None, current_user
     return payment_service.create_order(booking_id, callback_url)
 
 @router.post("/payment/verify")
-def verify_payment(data: VerifyPaymentSchema, current_user: dict = Depends(get_current_user)):
+def verify_payment(data: VerifyPaymentSchema):
     return payment_service.verify_payment(data.model_dump())
 
 @router.post("/payment/webhook")
