@@ -161,6 +161,7 @@
             const amount = getParam("amount");
             const orderId = getParam("orderId");
             const bookingId = getParam("bookingId");
+            const callbackUrl = getParam("callbackUrl");
 
             if (!key || !amount || !orderId) {
                 document.querySelector(".title").textContent = "Invalid payment link";
@@ -177,16 +178,36 @@
                 description: "Turf Booking Payment",
                 order_id: orderId,
                 handler: (response) => {
-                    const redirectUrl =
-                        `exp+tikito-player:///payment-success?orderId=${response.razorpay_order_id}` +
-                        `&paymentId=${response.razorpay_payment_id}` +
-                        `&signature=${response.razorpay_signature}` +
-                        `&bookingId=${bookingId || ''}`;
-                    redirectToApp(redirectUrl);
+                    // Call verify endpoint on backend directly
+                    fetch("/users/payment/verify", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            booking_id: bookingId,
+                            razorpay_order_id: response.razorpay_order_id,
+                            razorpay_payment_id: response.razorpay_payment_id,
+                            razorpay_signature: response.razorpay_signature,
+                        })
+                    }).then(() => {
+                        // Redirect back to app
+                        const appUrl = callbackUrl
+                            ? `${callbackUrl}?orderId=${response.razorpay_order_id}&paymentId=${response.razorpay_payment_id}&signature=${response.razorpay_signature}&bookingId=${bookingId || ''}`
+                            : `exp+tikito-player:///payment-success?orderId=${response.razorpay_order_id}&paymentId=${response.razorpay_payment_id}&signature=${response.razorpay_signature}&bookingId=${bookingId || ''}`;
+                        redirectToApp(appUrl);
+                    }).catch(() => {
+                        // Even if verify call fails, redirect back
+                        const appUrl = callbackUrl
+                            ? `${callbackUrl}?orderId=${response.razorpay_order_id}&paymentId=${response.razorpay_payment_id}&signature=${response.razorpay_signature}&bookingId=${bookingId || ''}`
+                            : `exp+tikito-player:///payment-success?orderId=${response.razorpay_order_id}&paymentId=${response.razorpay_payment_id}&signature=${response.razorpay_signature}&bookingId=${bookingId || ''}`;
+                        redirectToApp(appUrl);
+                    });
                 },
                 modal: {
                     ondismiss: () => {
-                        redirectToApp("exp+tikito-player:///payment-failed");
+                        const failUrl = callbackUrl
+                            ? `${callbackUrl}?status=failed`
+                            : "exp+tikito-player:///payment-failed";
+                        redirectToApp(failUrl);
                     }
                 },
                 theme: { color: "#4F46E5" }
