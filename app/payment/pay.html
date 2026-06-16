@@ -162,6 +162,7 @@
             const orderId = getParam("orderId");
             const bookingId = getParam("bookingId");
             const callbackUrl = getParam("callbackUrl");
+            const token = getParam("token");
 
             if (!key || !amount || !orderId) {
                 document.querySelector(".title").textContent = "Invalid payment link";
@@ -179,9 +180,12 @@
                 order_id: orderId,
                 handler: (response) => {
                     // Call verify endpoint on backend directly
+                    const headers = { "Content-Type": "application/json" };
+                    if (token) headers["Authorization"] = "Bearer " + token;
+
                     fetch("/users/payment/verify", {
                         method: "POST",
-                        headers: { "Content-Type": "application/json" },
+                        headers: headers,
                         body: JSON.stringify({
                             booking_id: bookingId,
                             razorpay_order_id: response.razorpay_order_id,
