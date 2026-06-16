@@ -89,6 +89,7 @@ def get_nearby_turfs(lat: float, lng: float, radius_km: float) -> list:
 def get_turfs_by_city(city: str) -> list:
     """Get turfs by city."""
     import json
+    from decimal import Decimal
 
     conn = get_connection()
     try:
@@ -105,7 +106,14 @@ def get_turfs_by_city(city: str) -> list:
         ).mappings().all()
         result = []
         for row in rows:
-            item = {k: str(v) if hasattr(v, 'hex') else v for k, v in dict(row).items()}
+            item = {}
+            for k, v in dict(row).items():
+                if hasattr(v, 'hex'):
+                    item[k] = str(v)
+                elif isinstance(v, Decimal):
+                    item[k] = str(v)
+                else:
+                    item[k] = v
             # Parse turf_images from JSON string to array
             if item.get("turf_images"):
                 try:
