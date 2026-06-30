@@ -29,7 +29,7 @@ CREATE TABLE public.admins (
 CREATE TABLE public.users (
 	user_id uuid DEFAULT gen_random_uuid() NOT NULL,
 	full_name varchar NOT NULL,
-	phone_no varchar NOT NULL,
+	phone_no varchar NULL,
 	email varchar NULL,
 	"password" text NOT NULL,
 	is_active bool DEFAULT true NULL,

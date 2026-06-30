@@ -16,7 +16,7 @@ class LoginSchema(BaseModel):
 class UserMeSchema(BaseModel):
     user_id: UUID
     full_name: str
-    phone_no: str
+    phone_no: str | None = None
     email: str | None = None
     is_active: bool
     is_verified: bool

@@ -12,7 +12,7 @@ router = APIRouter(prefix="/users", tags=["users"])
 
 class CreateUser(BaseModel):
     full_name: str
-    phone_no: str
+    phone_no: str | None = None
     email: str | None = None
     password: str
 

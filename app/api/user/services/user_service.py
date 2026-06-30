@@ -4,12 +4,28 @@ from app.core.connectdb import get_connection
 def create(data: dict) -> dict:
     conn = get_connection()
     try:
-        existing = conn.execute(
-            text("SELECT user_id FROM users WHERE phone_no = :phone_no OR email = :email"),
-            {"phone_no": data.get("phone_no"), "email": data.get("email")}
-        ).fetchone()
-        if existing:
-            return {"error": "User with this phone or email already exists"}
+        # Build dynamic query to check for existing user
+        conditions = []
+        params = {}
+        
+        if data.get("phone_no"):
+            conditions.append("phone_no = :phone_no")
+            params["phone_no"] = data.get("phone_no")
+        
+        if data.get("email"):
+            conditions.append("email = :email")
+            params["email"] = data.get("email")
+        
+        # Only check if at least one identifier is provided
+        if conditions:
+            query = f"SELECT user_id FROM users WHERE {' OR '.join(conditions)}"
+            existing = conn.execute(text(query), params).fetchone()
+            if existing:
+                return {"error": "User with this phone or email already exists"}
+        
+        # Ensure at least email or phone is provided
+        if not data.get("phone_no") and not data.get("email"):
+            return {"error": "Either phone number or email must be provided"}
 
         result = conn.execute(
             text("""
