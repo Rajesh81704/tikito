@@ -27,18 +27,24 @@ jobs:
             # Pull latest changes
             git pull origin main
             
+            # Update nginx configuration if changed
+            if [ -f nginx/tikito-api.conf ]; then
+              # Check if nginx config has changed
+              if ! diff -q nginx/tikito-api.conf /etc/nginx/conf.d/tikito-api.conf > /dev/null 2>&1; then
+                echo "Nginx config changed, updating..."
+                sudo cp nginx/tikito-api.conf /etc/nginx/conf.d/tikito-api.conf
+                sudo nginx -t && sudo systemctl reload nginx
+                echo "Nginx configuration updated and reloaded"
+              else
+                echo "Nginx config unchanged, skipping"
+              fi
+            fi
+            
             # Activate virtual environment and install/update dependencies
             source venv/bin/activate
             pip install -r requirements.txt
             
             # Restart the application
-            # Option 1: If using systemd
-            sudo systemctl restart tikito || true
-            
-            # Option 2: If using PM2 (uncomment if using PM2)
-            # pm2 restart tikito || true
-            
-            # Option 3: If using supervisor (uncomment if using supervisor)
-            # sudo supervisorctl restart tikito || true
+            sudo systemctl restart tikito
             
             echo "Deployment completed successfully!"
