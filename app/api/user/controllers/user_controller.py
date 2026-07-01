@@ -2,7 +2,7 @@ from uuid import UUID
 from decimal import Decimal
 from datetime import datetime, time, date
 from fastapi import APIRouter, Depends, Request, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from app.api.user.services import user_service
 from app.api.user.services import payment_service
 from app.api.vendor.services import vendor_service
@@ -15,6 +15,13 @@ class CreateUser(BaseModel):
     phone_no: str | None = None
     email: str | None = None
     password: str
+    
+    @field_validator('phone_no', 'email', mode='before')
+    @classmethod
+    def empty_str_to_none(cls, v):
+        if v == '' or v is None:
+            return None
+        return v
 
 class TurfResponseSchema(BaseModel):
     turf_field_id: str
