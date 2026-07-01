@@ -24,6 +24,39 @@
             justify-content: center;
             padding: 32px 24px;
             color: #111827;
+            transition: background 0.3s, color 0.3s;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            body {
+                background: #18181b;
+                color: #fafafa;
+            }
+            .card {
+                background: #27272a !important;
+                border-color: #3f3f46 !important;
+                box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2) !important;
+            }
+            .title {
+                color: #fafafa !important;
+            }
+            .subtitle {
+                color: #a1a1aa !important;
+            }
+            .badge {
+                background: #18181b !important;
+                border-color: #3f3f46 !important;
+                color: #a1a1aa !important;
+            }
+            .badge svg {
+                stroke: #a1a1aa !important;
+            }
+            .divider {
+                background: #3f3f46 !important;
+            }
+            .logo {
+                color: #6366f1 !important;
+            }
         }
 
         .card {
