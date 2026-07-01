@@ -3,7 +3,7 @@ from decimal import Decimal
 from datetime import datetime, time, date
 from enum import Enum
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from app.api.vendor.services import vendor_service, vendor_auth_service
 from app.api.core.dependencies import get_current_user
 from app.api.core.r2_storage import upload_file
@@ -11,11 +11,21 @@ from app.api.core.r2_storage import upload_file
 router = APIRouter(prefix="/vendors", tags=["vendors"])
 
 class VendorSignupSchema(BaseModel):
+    model_config = {"extra": "ignore"}
+    
     vendor_full_name: str
-    vendor_phone_no: str
-    vendor_email_id: str | None = None
-    vendor_address: str | None = None
+    vendor_phone_no: str | None = Field(default=None)
+    vendor_email_id: str | None = Field(default=None)
+    vendor_address: str | None = Field(default=None)
     password: str
+    
+    @field_validator('vendor_phone_no', 'vendor_email_id', mode='before')
+    @classmethod
+    def empty_str_to_none(cls, v):
+        # Convert empty strings to None
+        if v == '' or (isinstance(v, str) and v.strip() == ''):
+            return None
+        return v
 
 class AddTurfSchema(BaseModel):
     turf_name: str

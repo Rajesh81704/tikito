@@ -4,12 +4,28 @@ from app.core.connectdb import get_connection
 def signup(data: dict) -> dict:
     conn = get_connection()
     try:
-        check_availability = conn.execute(
-            text("SELECT vendor_id FROM vendors WHERE vendor_phone_no = :vendor_phone_no"),
-            {"vendor_phone_no": data.get("vendor_phone_no")}
-        )
-        if check_availability.fetchone():
-            return {"error": "Phone number already registered"}
+        # Build dynamic query to check for existing vendor
+        conditions = []
+        params = {}
+        
+        if data.get("vendor_phone_no"):
+            conditions.append("vendor_phone_no = :vendor_phone_no")
+            params["vendor_phone_no"] = data.get("vendor_phone_no")
+        
+        if data.get("vendor_email_id"):
+            conditions.append("vendor_email_id = :vendor_email_id")
+            params["vendor_email_id"] = data.get("vendor_email_id")
+        
+        # Only check if at least one identifier is provided
+        if conditions:
+            query = f"SELECT vendor_id FROM vendors WHERE {' OR '.join(conditions)}"
+            existing = conn.execute(text(query), params).fetchone()
+            if existing:
+                return {"error": "Vendor with this phone or email already exists"}
+        
+        # Ensure at least email or phone is provided
+        if not data.get("vendor_phone_no") and not data.get("vendor_email_id"):
+            return {"error": "Either phone number or email must be provided"}
 
         result = conn.execute(
             text("""
