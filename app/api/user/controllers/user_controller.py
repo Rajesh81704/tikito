@@ -57,19 +57,19 @@ def sign_up(data: CreateUser):
     return user_service.create(data.model_dump())
 
 @router.get("/nearby-turfs")
-def get_nearby_turfs(lat: float, lng: float, radius_km: float = 10, current_user: dict = Depends(get_current_user)):
+def get_nearby_turfs(lat: float, lng: float, radius_km: float = 10):
     return user_service.get_nearby_turfs(lat, lng, radius_km)
 
 @router.get("/turfs", response_model=list[TurfResponseSchema])
-def get_turfs_by_city(city: str, current_user: dict = Depends(get_current_user)):
+def get_turfs_by_city(city: str):
     return user_service.get_turfs_by_city(city)
 
 @router.get("/ground-details", response_model=list[GroundResponseSchema])
-def get_turf_ground_details(turf_id: str, current_user: dict = Depends(get_current_user)):
+def get_turf_ground_details(turf_id: str):
     return vendor_service.get_grounds_by_turf(turf_id)
 
 @router.get("/available-slots/{turf_ground_id}")
-def get_available_slots(turf_ground_id: str, current_user: dict = Depends(get_current_user)):
+def get_available_slots(turf_ground_id: str):
     return user_service.get_available_slots(turf_ground_id)
 
 class VerifyPaymentSchema(BaseModel):
