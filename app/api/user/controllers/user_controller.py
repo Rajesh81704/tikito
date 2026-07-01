@@ -2,7 +2,7 @@ from uuid import UUID
 from decimal import Decimal
 from datetime import datetime, time, date
 from fastapi import APIRouter, Depends, Request, HTTPException
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, Field
 from app.api.user.services import user_service
 from app.api.user.services import payment_service
 from app.api.vendor.services import vendor_service
@@ -11,15 +11,18 @@ from app.api.core.dependencies import get_current_user
 router = APIRouter(prefix="/users", tags=["users"])
 
 class CreateUser(BaseModel):
+    model_config = {"extra": "ignore"}
+    
     full_name: str
-    phone_no: str | None = None
-    email: str | None = None
+    phone_no: str | None = Field(default=None)
+    email: str | None = Field(default=None)
     password: str
     
     @field_validator('phone_no', 'email', mode='before')
     @classmethod
     def empty_str_to_none(cls, v):
-        if v == '' or v is None:
+        # Convert empty strings to None
+        if v == '' or (isinstance(v, str) and v.strip() == ''):
             return None
         return v
 
