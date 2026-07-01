@@ -27,17 +27,13 @@ jobs:
             # Pull latest changes
             git pull origin main
             
-            # Update nginx configuration if changed
+            # Update nginx base configuration only if changed (preserves SSL config)
             if [ -f nginx/tikito-api.conf ]; then
-              # Check if nginx config has changed
-              if ! diff -q nginx/tikito-api.conf /etc/nginx/conf.d/tikito-api.conf > /dev/null 2>&1; then
-                echo "Nginx config changed, updating..."
-                sudo cp nginx/tikito-api.conf /etc/nginx/conf.d/tikito-api.conf
-                sudo nginx -t && sudo systemctl reload nginx
-                echo "Nginx configuration updated and reloaded"
-              else
-                echo "Nginx config unchanged, skipping"
-              fi
+              # Only update if base config (without SSL) has substantive changes
+              # This preserves certbot's SSL additions to the config
+              echo "Skipping nginx config update to preserve SSL configuration"
+              echo "Note: SSL config is managed by certbot, not git"
+              echo "If you need to update nginx config, do it manually and run: certbot --nginx -d api.tikito.in"
             fi
             
             # Activate virtual environment and install/update dependencies

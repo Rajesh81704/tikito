@@ -55,7 +55,25 @@ sudo certbot renew
 1. **Never commit SSL certificate files** - They are managed by Certbot on the server
 2. **The base config (without SSL)** is stored in git
 3. **Certbot modifies the server config** to add SSL configuration automatically
-4. **GitHub Actions preserves the SSL configuration** when updating
+4. **GitHub Actions DOES NOT update nginx config** - This preserves SSL settings added by certbot
+5. **To update nginx config manually**:
+   ```bash
+   # SSH into VPS
+   ssh root@213.210.21.236
+   
+   # Edit the base config in git if needed
+   cd /opt/tikito
+   nano nginx/tikito-api.conf
+   
+   # Copy to nginx (only if you know what you're doing)
+   sudo cp nginx/tikito-api.conf /etc/nginx/conf.d/tikito-api.conf
+   
+   # Re-run certbot to add SSL back
+   sudo certbot --nginx -d api.tikito.in --non-interactive --redirect
+   
+   # Test and reload
+   sudo nginx -t && sudo systemctl reload nginx
+   ```
 
 ## Troubleshooting
 
